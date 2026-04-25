@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node16",
+    "target": "es2024",
+    "lib": ["esnext"],
+    "module": "node20",
+    "rootDir": "src",
+    "outDir": "dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "noEmitOnError": true,
+    "types": ["node", "jest"],
+    "typeRoots": ["./node_modules/@types"],
+    "resolveJsonModule": true,
+    "paths": {
+      "@src/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}

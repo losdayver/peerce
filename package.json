@@ -1,0 +1,27 @@
+{
+  "name": "p2p_messenger",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test-run": "node -r module-alias/register dist/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.0",
+    "@typescript-eslint/parser": "^8.59.0",
+    "eslint": "^10.2.1"
+  },
+  "dependencies": {
+    "@types/jest": "^30.0.0",
+    "jest": "^30.3.0",
+    "module-alias": "^2.3.4"
+  },
+  "_moduleAliases": {
+    "@src": "dist",
+    "@cfg": "cfg"
+  }
+}
