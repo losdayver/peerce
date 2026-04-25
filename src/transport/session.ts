@@ -1,3 +1,4 @@
+import { MessageBuffer, MessageType } from "./messageBuffer";
 import { TransceiverIPv4 } from "./transceiver";
 
 export class Session {
@@ -9,7 +10,14 @@ export class Session {
 
   connect() {
     // todo retries
-    this.transceiverIPv4.__send(this.address, this.port, "connect to me!");
+    this.transceiverIPv4.__send(
+      this.address,
+      this.port,
+      MessageBuffer.construct({
+        type: MessageType.DATA,
+        payload: Buffer.from("connect to me!"),
+      })
+    );
   }
 
   send(msg: any) {
@@ -17,7 +25,10 @@ export class Session {
     this.transceiverIPv4.__send(
       this.address,
       this.port,
-      `this is message ${msg}`
+      MessageBuffer.construct({
+        type: MessageType.DATA,
+        payload: Buffer.from(msg),
+      })
     );
   }
 
