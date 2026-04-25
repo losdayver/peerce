@@ -5,6 +5,7 @@ import {
 } from "@src/utils/stateMachine";
 import { EventEmitter } from "node:events";
 import * as dgram from "node:dgram";
+import { Session } from "@src/transport/session";
 
 interface TransceiverEventEmitterMap {
   onConnected: [() => void];
@@ -16,26 +17,20 @@ interface TransceiverEventEmitterMap {
 const transceiverStateTransitionMap = {
   idle: ["listening", "error"] as const,
   listening: ["connecting", "error"] as const,
-  connecting: ["connected", "error", "closing"] as const,
-  connected: ["closing", "error"] as const,
   closing: ["closed", "error"] as const,
   closed: [] as const,
   error: [] as const,
 } satisfies AvailableTransitionsMap;
 
+interface TransceiverIPv4Params {
+  self?: {
+    address: string;
+    port: number;
+  };
+}
+
 export class TransceiverIPv4 {
-  constructor(
-    targetHost?: string,
-    targetPort?: number,
-    selfHost?: string,
-    selfPort?: number
-  ) {
-    this.targetHost = targetHost;
-    this.targetPort = targetPort;
-
-    this.selfHost = selfHost;
-    this.selfPort = selfPort;
-
+  constructor() {
     this.stateMachine = new StateMachine<typeof transceiverStateTransitionMap>(
       "idle",
       transceiverStateTransitionMap,
@@ -44,15 +39,14 @@ export class TransceiverIPv4 {
   }
 
   private socket: dgram.Socket | undefined;
-  private targetHost: string | undefined;
-  private targetPort: number | undefined;
-  private selfHost: string | undefined;
-  private selfPort: number | undefined;
+  private selfAddress: TransceiverIPv4Params["self"] | undefined;
+  private sessionMap: Map<string, Session> = new Map();
+  private stateMachine: StateMachine<typeof transceiverStateTransitionMap>;
 
-  //#region state
   private setupSocket = () => {
     this.socket = dgram.createSocket("udp4");
-    if (this.selfPort) this.socket.bind(this.selfPort, this.selfHost);
+    if (this.selfAddress)
+      this.socket.bind(this.selfAddress.port, this.selfAddress.address);
   };
 
   private bindSocketEvents = () => {
@@ -62,19 +56,23 @@ export class TransceiverIPv4 {
       this.stateMachine.doStateTransition("error");
     });
 
-    socket.on("message", this.onRawMessage);
+    socket.on("message", (msg, { address, port }) =>
+      this.onRawMessage(address, port, msg)
+    );
   };
 
-  private onRawMessage = (data) => {
-    console.info(data?.toString("utf8"));
-    // here we parse messages and decipher them
+  private onRawMessage = (address: string, port: number, msg: Buffer) => {
+    const key = `${address}:${port}`;
 
-    // do support for two mode of operation:
-    // 1. two transceivers know each other's addresses and ports
-    // 2. only one of two transceivers knows other's addresses and port.
-    // The other one waits for all connections and binds other address and port upon connection
+    let session = this.sessionMap.get(key);
+
+    if (!session) {
+      session = new Session(this, address, port);
+      this.sessionMap.set(key, session);
+    }
+
+    session.handleMessage(msg);
   };
-  //#endregion
 
   private transceiverStateLogic: StateMachineLogic<
     typeof transceiverStateTransitionMap
@@ -86,12 +84,12 @@ export class TransceiverIPv4 {
       },
     },
 
-    connecting: {
-      onEnter: () => {},
-    },
-
-    connected: {
-      onEnter: () => {},
+    closing: {
+      onEnter: () => {
+        this.socket?.removeAllListeners();
+        this.socket?.close();
+        this.stateMachine.doStateTransition("closed");
+      },
     },
 
     error: {
@@ -102,18 +100,33 @@ export class TransceiverIPv4 {
   };
 
   public eventEmitter = new EventEmitter<TransceiverEventEmitterMap>();
-  public stateMachine: StateMachine<typeof transceiverStateTransitionMap>;
 
-  public listen() {
+  public listen(self?: TransceiverIPv4Params["self"]) {
+    if (this.stateMachine.currentState != "idle")
+      throw new Error(`cannot listen on ${this.stateMachine.currentState}`);
+
+    this.selfAddress = self;
     this.stateMachine.doStateTransition("listening");
   }
-  public connect() {
-    this.stateMachine.doStateTransition("connecting");
+  public connect(address: string, port: number) {
+    if (this.stateMachine.currentState != "listening")
+      throw new Error(`cannot connect on ${this.stateMachine.currentState}`);
+
+    const session = new Session(this, address, port);
+    this.sessionMap.set(`${address}:${port}`, session);
+    session.connect();
+  }
+  public disconnect(address: string, port: number) {
+    const session = this.sessionMap.get(`${address}:${port}`);
+    if (session) session.disconnect();
   }
   public close() {
     this.stateMachine.doStateTransition("closing");
   }
-  public send(msg: any) {
-    this.socket?.send(msg, this.targetPort, this.targetHost);
+  public __send(address: string, port: number, msg: any) {
+    this.socket?.send(msg, port, address);
+  }
+  public send(address: string, port: number, msg: any) {
+    // this.socket?.send(msg, this.targetPort, this.targetHost);
   }
 }

@@ -9,7 +9,7 @@ export type StateMachineLogic<ATM extends AvailableTransitionsMap> = {
 };
 
 export class StateMachine<ATM extends AvailableTransitionsMap> {
-  private currentState: keyof ATM;
+  public currentState: keyof ATM;
   private logic: StateMachineLogic<ATM>;
   private transitions: ATM;
 
