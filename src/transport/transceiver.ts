@@ -8,7 +8,7 @@ import * as dgram from "node:dgram";
 import { Session } from "@src/transport/session";
 
 interface TransceiverEventEmitterMap {
-  onConnected: [() => void];
+  onConnected: [(address: string, port: number) => void];
   onClosed: [() => void];
   onError: [() => void];
   onReceive: [() => void];
@@ -16,7 +16,7 @@ interface TransceiverEventEmitterMap {
 
 const transceiverStateTransitionMap = {
   idle: ["listening", "error"] as const,
-  listening: ["connecting", "error"] as const,
+  listening: ["closing", "error"] as const,
   closing: ["closed", "error"] as const,
   closed: [] as const,
   error: [] as const,
@@ -69,6 +69,7 @@ export class TransceiverIPv4 {
     if (!session) {
       session = new Session(this, address, port);
       this.sessionMap.set(key, session);
+      session.connect();
     }
 
     session.handleMessage(msg);
@@ -127,6 +128,8 @@ export class TransceiverIPv4 {
     this.socket?.send(msg, port, address);
   }
   public send(address: string, port: number, msg: any) {
-    // this.socket?.send(msg, this.targetPort, this.targetHost);
+    const session = this.sessionMap.get(`${address}:${port}`);
+    if (!session) return;
+    session.sendData(msg);
   }
 }

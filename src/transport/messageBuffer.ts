@@ -19,26 +19,47 @@ const HEADER_SIZE = TYPE_SIZE + UID_SIZE + SEQ_SIZE + ACK_SIZE + SUM_SIZE;
 
 export interface Message {
   type: MessageType;
-  uid: number;
-  seq: number;
-  ack: number;
-  checksum: number;
+  uid?: number;
+  seq?: number;
+  ack?: number;
+  checksum?: number;
   payload?: Buffer;
 }
 
 export class MessageBuffer {
   static maxPayloadSize = 512;
 
-  static decode() {}
+  static decode(buffer: Buffer): Message {
+    const payloadSize = buffer.length - HEADER_SIZE;
+
+    const message: { [K in keyof Message]: Message[K] | null } = {
+      type: null,
+      uid: null,
+      seq: null,
+      ack: null,
+      checksum: null,
+      payload: payloadSize >= 0 ? Buffer.alloc(payloadSize) : null,
+    };
+
+    message.type = buffer.readUIntBE(0, TYPE_SIZE);
+    message.uid = buffer.readUIntBE(TYPE_SIZE, UID_SIZE);
+    message.seq = buffer.readUIntBE(UID_SIZE, SEQ_SIZE);
+    message.ack = buffer.readUIntBE(SEQ_SIZE, ACK_SIZE);
+    message.checksum = buffer.readUIntBE(ACK_SIZE, SUM_SIZE);
+    message.payload && buffer.copy(message.payload as Buffer, 0, HEADER_SIZE);
+
+    return message as Message;
+  }
+
   static construct(message: Pick<Message, "type" | "payload">) {
-    const { type, payload = Buffer.alloc(0) } = message;
+    const { type, payload = Buffer.alloc(1) } = message; // TODO had to specify 1 byte or else the final array would be empty
 
     const messages: Buffer[] = [];
     const uid = randomBytes(UID_SIZE).readUintBE(0, UID_SIZE);
     let seq = 0;
 
     for (const chunk of chunkBuffer(payload, MessageBuffer.maxPayloadSize)) {
-      const buffer = Buffer.alloc(HEADER_SIZE + (payload?.length ?? 0));
+      const buffer = Buffer.alloc(HEADER_SIZE + (chunk.length ?? 0));
 
       buffer.writeUIntBE(type, 0, TYPE_SIZE);
       buffer.writeUIntBE(uid, TYPE_SIZE, UID_SIZE);
@@ -50,7 +71,6 @@ export class MessageBuffer {
       // todo checksum
 
       messages.push(buffer);
-
       seq += 1;
     }
 
