@@ -1,6 +1,7 @@
 import {
   AvailableTransitionsMap,
   StateMachine,
+  StateMachineConfig,
   StateMachineLogic,
 } from "@src/utils/stateMachine";
 import { EventEmitter } from "node:events";
@@ -29,9 +30,15 @@ interface TransceiverIPv4Params {
   };
 }
 
+type TransceiverIPv4StateMachineConfig = StateMachineConfig<
+  typeof transceiverStateTransitionMap,
+  never,
+  TransceiverIPv4
+>;
+
 export class TransceiverIPv4 {
   constructor() {
-    this.stateMachine = new StateMachine<typeof transceiverStateTransitionMap>(
+    this.stateMachine = new StateMachine<TransceiverIPv4StateMachineConfig>(
       "idle",
       transceiverStateTransitionMap,
       this.transceiverStateLogic
@@ -41,7 +48,7 @@ export class TransceiverIPv4 {
   private socket: dgram.Socket | undefined;
   private selfAddress: TransceiverIPv4Params["self"] | undefined;
   private sessionMap: Map<string, Session> = new Map();
-  private stateMachine: StateMachine<typeof transceiverStateTransitionMap>;
+  private stateMachine: StateMachine<TransceiverIPv4StateMachineConfig>;
 
   private setupSocket = () => {
     this.socket = dgram.createSocket("udp4");
@@ -75,30 +82,29 @@ export class TransceiverIPv4 {
     session.handleMessage(msg);
   };
 
-  private transceiverStateLogic: StateMachineLogic<
-    typeof transceiverStateTransitionMap
-  > = {
-    listening: {
-      onEnter: () => {
-        this.setupSocket();
-        this.bindSocketEvents();
+  private transceiverStateLogic: StateMachineLogic<TransceiverIPv4StateMachineConfig> =
+    {
+      listening: {
+        onEnter: () => {
+          this.setupSocket();
+          this.bindSocketEvents();
+        },
       },
-    },
 
-    closing: {
-      onEnter: () => {
-        this.socket?.removeAllListeners();
-        this.socket?.close();
-        this.stateMachine.doStateTransition("closed");
+      closing: {
+        onEnter: () => {
+          this.socket?.removeAllListeners();
+          this.socket?.close();
+          this.stateMachine.doStateTransition("closed");
+        },
       },
-    },
 
-    error: {
-      onEnter: () => {
-        this.socket?.close();
+      error: {
+        onEnter: () => {
+          this.socket?.close();
+        },
       },
-    },
-  };
+    };
 
   public eventEmitter = new EventEmitter<TransceiverEventEmitterMap>();
 

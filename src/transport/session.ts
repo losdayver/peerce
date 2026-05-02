@@ -1,7 +1,10 @@
 import {
   AvailableTransitionsMap,
   StateMachine,
+  StateMachineConfig,
   StateMachineLogic,
+  StateMachineLogicEntry,
+  StateMachineLogicEntryBase,
 } from "@src/utils/stateMachine";
 import { Message, MessageBuffer, MessageType } from "./messageBuffer";
 import { TransceiverIPv4 } from "./transceiver";
@@ -17,30 +20,34 @@ const sessionStateTransitionMap = {
 
 type SessionLogicHandler = (master: Session, message: Message) => void;
 
+type SessionStateMachineConfig = StateMachineConfig<
+  typeof sessionStateTransitionMap,
+  SessionLogicHandler,
+  Session
+>;
+
+type SessionStateMachine = StateMachine<SessionStateMachineConfig>;
+type SessionStateMachineLogic = StateMachineLogic<SessionStateMachineConfig>;
+type SessionStateMachineLogicEntry =
+  StateMachineLogicEntry<SessionStateMachineConfig>;
+
 export class Session {
   constructor(
     private transceiverIPv4: TransceiverIPv4,
     public address: string,
     public port: number
   ) {
-    this.stateMachine = new StateMachine<
-      typeof sessionStateTransitionMap,
-      SessionLogicHandler,
-      Session
-    >("idle", sessionStateTransitionMap, this.sessionStateLogic, this);
+    this.stateMachine = new StateMachine<SessionStateMachineConfig>(
+      "idle",
+      sessionStateTransitionMap,
+      this.sessionStateLogic,
+      this
+    );
   }
 
-  private stateMachine: StateMachine<
-    typeof sessionStateTransitionMap,
-    SessionLogicHandler,
-    Session
-  >;
+  private stateMachine: SessionStateMachine;
 
-  private sessionStateLogic: StateMachineLogic<
-    typeof sessionStateTransitionMap,
-    SessionLogicHandler,
-    Session
-  > = {
+  private sessionStateLogic: SessionStateMachineLogic = {
     connecting: {
       retriesInterval: null,
       retriesNumSeconds: 0.5,
@@ -73,32 +80,8 @@ export class Session {
       onExit(to, master) {
         clearInterval(this.retriesInterval);
       },
-    },
-    connected: {
-      keepAliveNumSeconds: 10,
-      keepAliveInterval: null,
-      onEnter(_, master) {
-        this.keepAliveInterval = setInterval(() => {
-          master!.sendOne({ type: MessageType.KEEP_ALIVE });
-        }, this.keepAliveNumSeconds * 1000);
-      },
-      onExit() {
-        clearInterval(this.keepAliveInterval);
-      },
-      logicHandler(master, message) {
-        switch (message.type) {
-          case MessageType.DATA:
-          case MessageType.DATA_ACK:
-            console.log(
-              `received from ${master.address}:${master.port}: ${message.payload?.toString("utf8")}`
-            );
-          case MessageType.KEEP_ALIVE:
-            console.log(
-              `received from ${master.address}:${master.port}: KEEP ALIVE`
-            );
-        }
-      },
-    },
+    } satisfies SessionStateMachineLogicEntry,
+    connected: new ConnectedState(),
   };
 
   private sendOne(message: Message) {
@@ -135,4 +118,35 @@ export class Session {
     // todo retries
     this.transceiverIPv4.__send(this.address, this.port, "disconnect me!");
   }
+}
+
+class ConnectedState extends StateMachineLogicEntryBase<SessionStateMachineConfig> {
+  sentMap = new Map<string, { length: number; messages: Message[] }>();
+  keepAliveNumSeconds = 10;
+  keepAliveInterval: NodeJS.Timeout | undefined;
+
+  onEnter = (_, master) => {
+    this.keepAliveInterval = setInterval(() => {
+      master!.sendOne({ type: MessageType.KEEP_ALIVE });
+    }, this.keepAliveNumSeconds * 1000);
+  };
+
+  onExit = () => {
+    clearInterval(this.keepAliveInterval);
+  };
+
+  logicHandler = (master, message) => {
+    switch (message.type) {
+      case MessageType.DATA:
+      case MessageType.DATA_ACK:
+        console.log(
+          `received from ${master.address}:${master.port}: ${message.payload?.toString("utf8")}`
+        );
+        this.sentMap;
+      case MessageType.KEEP_ALIVE:
+        console.log(
+          `received from ${master.address}:${master.port}: KEEP ALIVE`
+        );
+    }
+  };
 }

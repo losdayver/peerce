@@ -13,9 +13,11 @@ export const enum MessageType {
 const TYPE_SIZE = 1;
 const UID_SIZE = 4;
 const SEQ_SIZE = 4;
+const TOTAL_SIZE = 4;
 const ACK_SIZE = 4;
 const SUM_SIZE = 2;
-const HEADER_SIZE = TYPE_SIZE + UID_SIZE + SEQ_SIZE + ACK_SIZE + SUM_SIZE;
+const HEADER_SIZE =
+  TYPE_SIZE + UID_SIZE + SEQ_SIZE + TOTAL_SIZE + ACK_SIZE + SUM_SIZE;
 
 export interface Message {
   type: MessageType;
@@ -45,30 +47,45 @@ export class MessageBuffer {
     message.uid = buffer.readUIntBE(TYPE_SIZE, UID_SIZE);
     message.seq = buffer.readUIntBE(UID_SIZE, SEQ_SIZE);
     message.ack = buffer.readUIntBE(SEQ_SIZE, ACK_SIZE);
-    message.checksum = buffer.readUIntBE(ACK_SIZE, SUM_SIZE);
+    message.ack = buffer.readUIntBE(ACK_SIZE, TOTAL_SIZE);
+    message.checksum = buffer.readUIntBE(TOTAL_SIZE, SUM_SIZE);
     message.payload && buffer.copy(message.payload as Buffer, 0, HEADER_SIZE);
 
     return message as Message;
   }
 
   static construct(message: Pick<Message, "type" | "payload">) {
-    const { type, payload = Buffer.alloc(1) } = message; // TODO had to specify 1 byte or else the final array would be empty
+    const { type, payload } = message;
 
     const messages: Buffer[] = [];
     const uid = randomBytes(UID_SIZE).readUintBE(0, UID_SIZE);
     let seq = 0;
 
-    for (const chunk of chunkBuffer(payload, MessageBuffer.maxPayloadSize)) {
-      const buffer = Buffer.alloc(HEADER_SIZE + (chunk.length ?? 0));
+    const chunks = payload
+      ? chunkBuffer(payload, MessageBuffer.maxPayloadSize)
+      : [Buffer.alloc(0)];
+
+    const total = chunks.length;
+
+    for (const chunk of chunks) {
+      const buffer = Buffer.alloc(HEADER_SIZE + chunk.length);
 
       buffer.writeUIntBE(type, 0, TYPE_SIZE);
       buffer.writeUIntBE(uid, TYPE_SIZE, UID_SIZE);
       buffer.writeUIntBE(seq, UID_SIZE, SEQ_SIZE);
-      buffer.writeUIntBE(0, SEQ_SIZE, ACK_SIZE); // todo implement
-      buffer.writeUIntBE(0, ACK_SIZE, SUM_SIZE); // todo implement
-      chunk.copy(buffer, HEADER_SIZE);
+      buffer.writeUIntBE(0, SEQ_SIZE, ACK_SIZE); // todo ack
+      buffer.writeUIntBE(
+        total,
+        TYPE_SIZE + UID_SIZE + SEQ_SIZE + ACK_SIZE,
+        TOTAL_SIZE
+      );
+      buffer.writeUIntBE(
+        0,
+        TYPE_SIZE + UID_SIZE + SEQ_SIZE + ACK_SIZE + TOTAL_SIZE,
+        SUM_SIZE
+      ); // checksum
 
-      // todo checksum
+      if (chunk.length > 0) chunk.copy(buffer, HEADER_SIZE);
 
       messages.push(buffer);
       seq += 1;
