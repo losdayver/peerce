@@ -6,7 +6,12 @@ import {
   StateMachineLogicEntry,
   StateMachineLogicEntryBase,
 } from "@src/utils/stateMachine";
-import { Message, MessageBuffer, MessageType } from "./messageBuffer";
+import {
+  DataMessage,
+  Message,
+  MessageBuffer,
+  MessageType,
+} from "./messageBuffer";
 import { TransceiverIPv4 } from "./transceiver";
 
 const sessionStateTransitionMap = {
@@ -81,10 +86,10 @@ export class Session {
         clearInterval(this.retriesInterval);
       },
     } satisfies SessionStateMachineLogicEntry,
-    connected: new ConnectedState(),
+    connected: new ConnectedState(this),
   };
 
-  private sendOne(message: Message) {
+  sendOne(message: Message) {
     this.transceiverIPv4.__send(
       this.address,
       this.port,
@@ -92,26 +97,27 @@ export class Session {
     );
   }
 
+  sendData(rawData: any) {
+    const msgs = MessageBuffer.construct({
+      type: MessageType.DATA,
+      payload: Buffer.from(rawData),
+    });
+
+    // todo continuous sender. maybe put the logic into ConnectedState
+    for (const msg of msgs) {
+      this.transceiverIPv4.__send(this.address, this.port, msg);
+    }
+  }
+
   handleMessage(buffer: Buffer) {
     const message = MessageBuffer.decode(buffer);
+    if (!message) return;
 
     this.stateMachine.fireLogicHandler(this, message);
   }
 
   connect() {
     this.stateMachine.doStateTransition("connecting");
-  }
-
-  sendData(msg: any) {
-    // todo serialization logic and ack await
-    this.transceiverIPv4.__send(
-      this.address,
-      this.port,
-      MessageBuffer.construct({
-        type: MessageType.DATA,
-        payload: Buffer.from(msg),
-      })
-    );
   }
 
   disconnect() {
@@ -121,9 +127,52 @@ export class Session {
 }
 
 class ConnectedState extends StateMachineLogicEntryBase<SessionStateMachineConfig> {
-  sentMap = new Map<string, { length: number; messages: Message[] }>();
-  keepAliveNumSeconds = 10;
-  keepAliveInterval: NodeJS.Timeout | undefined;
+  constructor(private session: Session) {
+    super();
+  }
+
+  private sentMap = new Map<string, { length: number; messages: Message[] }>();
+  private keepAliveNumSeconds = 10;
+  private keepAliveInterval: NodeJS.Timeout | undefined;
+
+  private readonly messageCollector: Record<
+    DataMessage["uid"],
+    {
+      isCollected: boolean;
+      data: Record<DataMessage["seq"], DataMessage>;
+    }
+  > = {};
+
+  private sendAck(message: DataMessage) {
+    this.session.sendOne({
+      type: MessageType.DATA_ACK,
+      uid: message.uid,
+      ack: message.seq,
+    });
+  }
+
+  private collectDataMessagePart(message: DataMessage) {
+    let msgTuple = this.messageCollector[message.uid];
+    if (!msgTuple)
+      msgTuple = this.messageCollector[message.uid] = {
+        isCollected: false,
+        data: {},
+      };
+
+    msgTuple.data[message.seq] = message;
+
+    this.sendAck(message);
+
+    if (Object.keys(msgTuple.data).length == message.total) {
+      msgTuple.isCollected = true;
+      // todo collected message event
+      console.log(
+        `COLLECTED FULL MESSAGE ${Object.values(msgTuple.data)
+          .map((d) => d.payload.toString())
+          .join("")}`
+      );
+    }
+  }
 
   onEnter = (_, master) => {
     this.keepAliveInterval = setInterval(() => {
@@ -135,14 +184,15 @@ class ConnectedState extends StateMachineLogicEntryBase<SessionStateMachineConfi
     clearInterval(this.keepAliveInterval);
   };
 
-  logicHandler = (master, message) => {
+  logicHandler = (master, message: Message) => {
     switch (message.type) {
       case MessageType.DATA:
+        // todo check all fields are satisfied for message to me DataMessage
+        this.collectDataMessagePart(message as DataMessage);
+        break;
       case MessageType.DATA_ACK:
-        console.log(
-          `received from ${master.address}:${master.port}: ${message.payload?.toString("utf8")}`
-        );
         this.sentMap;
+        break;
       case MessageType.KEEP_ALIVE:
         console.log(
           `received from ${master.address}:${master.port}: KEEP ALIVE`
