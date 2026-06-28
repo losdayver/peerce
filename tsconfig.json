@@ -1,19 +1,25 @@
 {
   "compilerOptions": {
-    "moduleResolution": "node16",
-    "target": "es2024",
-    "lib": ["esnext"],
-    "module": "node20",
     "rootDir": "src",
     "outDir": "dist",
-    "strict": true,
-    "esModuleInterop": true,
-    "strictNullChecks": true,
-    "noImplicitAny": false,
-    "noEmitOnError": true,
+
+    "target": "esnext",
+
+    "module": "node20",
+    "moduleResolution": "nodenext",
+
+    "lib": ["esnext"],
     "types": ["node", "jest"],
     "typeRoots": ["./node_modules/@types"],
+
+    "esModuleInterop": true,
     "resolveJsonModule": true,
+
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+
+    "noEmitOnError": true,
+
     "paths": {
       "@src/*": ["./src/*"]
     }
