@@ -21,6 +21,10 @@ export class SimplePeer {
     this.transceiver.listen();
     this.transceiver.connect(relayAddr, relayPort);
 
+    console.log("connecting to relay");
+
+    await new Promise((res) => setTimeout(res, 2000)); // todo fix
+
     let resolver: () => void;
     let promise = new Promise((req) => (resolver = () => req(true)));
 
@@ -31,6 +35,7 @@ export class SimplePeer {
     this.transceiver.eventEmitter.addListener("onConnected", listener);
 
     await promise;
+    console.log("ready to send");
     this.transceiver.eventEmitter.removeListener("onConnected", listener);
 
     this.transceiver.send(
@@ -61,7 +66,7 @@ export class SimplePeer {
           }
         );
 
-        await new Promise((res) => setTimeout(res, 2000)); // todo fix
+        await new Promise((res) => setTimeout(res, 10000)); // todo fix
 
         if (payload)
           this.transceiver.send(obj.distantAddress, obj.distantPort, payload);

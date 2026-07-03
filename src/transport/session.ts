@@ -55,7 +55,7 @@ export class Session {
   private sessionStateLogic: SessionStateMachineLogic = {
     connecting: {
       retriesInterval: null,
-      retriesNumSeconds: 0.5,
+      retriesNumSeconds: 5,
       onEnter(_, master) {
         let retries = 10;
         this.retriesInterval = setInterval(() => {
@@ -166,9 +166,10 @@ class ConnectedState extends StateMachineLogicEntryBase<SessionStateMachineConfi
     if (Object.keys(msgTuple.data).length == message.total) {
       msgTuple.isCollected = true;
       // todo collected message event
-      const fullMsgString = Object.values(msgTuple.data)
-        .map((d) => d.payload.toString())
-        .join("");
+      const buffers = Object.values(msgTuple.data).map(
+        ({ payload }) => payload
+      );
+      const fullMsgString = Buffer.concat(buffers).toString("utf8");
       this.session.transceiverIPv4.eventEmitter.emit(
         "onReceive",
         {
@@ -177,7 +178,6 @@ class ConnectedState extends StateMachineLogicEntryBase<SessionStateMachineConfi
         },
         fullMsgString
       );
-      console.log(`COLLECTED FULL MESSAGE ${fullMsgString}`);
     }
   }
 
