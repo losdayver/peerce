@@ -38,7 +38,7 @@ type SessionStateMachineLogicEntry =
 
 export class Session {
   constructor(
-    private transceiverIPv4: TransceiverIPv4,
+    public transceiverIPv4: TransceiverIPv4,
     public address: string,
     public port: number
   ) {
@@ -166,15 +166,27 @@ class ConnectedState extends StateMachineLogicEntryBase<SessionStateMachineConfi
     if (Object.keys(msgTuple.data).length == message.total) {
       msgTuple.isCollected = true;
       // todo collected message event
-      console.log(
-        `COLLECTED FULL MESSAGE ${Object.values(msgTuple.data)
-          .map((d) => d.payload.toString())
-          .join("")}`
+      const fullMsgString = Object.values(msgTuple.data)
+        .map((d) => d.payload.toString())
+        .join("");
+      this.session.transceiverIPv4.eventEmitter.emit(
+        "onReceive",
+        {
+          address: this.session.address,
+          port: this.session.port,
+        },
+        fullMsgString
       );
+      console.log(`COLLECTED FULL MESSAGE ${fullMsgString}`);
     }
   }
 
   onEnter = (_, master) => {
+    this.session.transceiverIPv4.eventEmitter.emit(
+      "onConnected",
+      this.session.address,
+      this.session.port
+    );
     this.keepAliveInterval = setInterval(() => {
       master!.sendOne({ type: MessageType.KEEP_ALIVE });
     }, this.keepAliveNumSeconds * 1000);

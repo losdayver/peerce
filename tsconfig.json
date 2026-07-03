@@ -5,7 +5,7 @@
 
     "target": "esnext",
 
-    "module": "node20",
+    "module": "nodenext",
     "moduleResolution": "nodenext",
 
     "lib": ["esnext"],

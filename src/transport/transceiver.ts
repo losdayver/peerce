@@ -9,10 +9,10 @@ import * as dgram from "node:dgram";
 import { Session } from "@src/transport/session";
 
 interface TransceiverEventEmitterMap {
-  onConnected: [(address: string, port: number) => void];
-  onClosed: [() => void];
-  onError: [() => void];
-  onReceive: [() => void];
+  onConnected: [address: string, port: number];
+  onClosed: [];
+  onError: [];
+  onReceive: [{ address: string; port: number }, msg: string];
 }
 
 const transceiverStateTransitionMap = {
