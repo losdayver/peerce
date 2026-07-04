@@ -55,7 +55,7 @@ export class Session {
   private sessionStateLogic: SessionStateMachineLogic = {
     connecting: {
       retriesInterval: null,
-      retriesNumSeconds: 1,
+      retriesNumSeconds: 0.3,
       onEnter(_, master) {
         let retries = 10;
         this.retriesInterval = setInterval(() => {
