@@ -1,6 +1,6 @@
 {
   "name": "p2p_messenger",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "",
   "scripts": {
     "complete-build": "npm i && npx tsc && npm pack"
@@ -9,7 +9,7 @@
   "author": "",
   "license": "MIT",
   "bin": {
-    "p2p-s-client": "./dist/simple/bin/client.js",
+    "p2p-s-client": "./dist/simple/bin/peer.js",
     "p2p-s-relay": "./dist/simple/bin/relay.js"
   },
   "devDependencies": {

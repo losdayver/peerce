@@ -16,7 +16,9 @@ export interface SimpleProtocolClientConfig {
   relayPort?: number;
   selfTag?: string;
   distantTag?: string;
-  payload?: string;
+  payload?: string | Buffer;
+  fromFile?: string;
+  outFile?: string;
 }
 
 export interface SimpleProtocolRelayConfig {

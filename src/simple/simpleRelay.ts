@@ -21,10 +21,10 @@ export class SimpleRelay {
 
   onReceiveFromPeer = (
     addrObj: { address: string; port: number },
-    msg: string
+    msg: Buffer
   ) => {
     // todo zod or something
-    const obj = JSON.parse(msg) as PeerToRelaySessionRequest;
+    const obj = JSON.parse(msg.toString()) as PeerToRelaySessionRequest;
     console.log("adding new record to target map", addrObj, msg);
 
     this.requestMap.set(`${obj.selfTag}:${obj.distantTag}`, { ...addrObj });

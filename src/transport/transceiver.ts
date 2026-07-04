@@ -6,13 +6,15 @@ import {
 } from "@src/utils/stateMachine";
 import { EventEmitter } from "node:events";
 import * as dgram from "node:dgram";
-import { Session } from "@src/transport/session";
+import { Session } from "@src/transport/session/session";
+import { MessageBuffer, MessageType } from "./messageBuffer";
 
 interface TransceiverEventEmitterMap {
   onConnected: [address: string, port: number];
+  onSessionClosed: [address: string, port: number];
   onClosed: [];
   onError: [];
-  onReceive: [{ address: string; port: number }, msg: string];
+  onReceive: [{ address: string; port: number }, msg: Buffer];
 }
 
 const transceiverStateTransitionMap = {
@@ -32,8 +34,7 @@ interface TransceiverIPv4Params {
 
 type TransceiverIPv4StateMachineConfig = StateMachineConfig<
   typeof transceiverStateTransitionMap,
-  never,
-  TransceiverIPv4
+  never
 >;
 
 export class TransceiverIPv4 {
@@ -68,18 +69,20 @@ export class TransceiverIPv4 {
     );
   };
 
-  private onRawMessage = (address: string, port: number, msg: Buffer) => {
+  private onRawMessage = (address: string, port: number, buffer: Buffer) => {
     const key = `${address}:${port}`;
 
+    const msg = MessageBuffer.decode(buffer);
     let session = this.sessionMap.get(key);
 
-    if (!session) {
+    // Prevent FIN message from creating new session
+    if (!session && msg?.type !== MessageType.FIN) {
       session = new Session(this, address, port);
       this.sessionMap.set(key, session);
       session.connect();
     }
 
-    session.handleMessage(msg);
+    session?.handleMessage(msg);
   };
 
   private transceiverStateLogic: StateMachineLogic<TransceiverIPv4StateMachineConfig> =
@@ -131,7 +134,7 @@ export class TransceiverIPv4 {
   public close() {
     this.stateMachine.doStateTransition("closing");
   }
-  public send(address: string, port: number, msg: any) {
+  public send(address: string, port: number, msg: string | Buffer) {
     const session = this.sessionMap.get(`${address}:${port}`);
     if (!session) return;
     session.sendData(msg);
@@ -141,5 +144,6 @@ export class TransceiverIPv4 {
   }
   public __deleteSessionFormMap(address: string, port: number) {
     this.sessionMap.delete(`${address}:${port}`);
+    this.eventEmitter.emit("onSessionClosed", address, port);
   }
 }

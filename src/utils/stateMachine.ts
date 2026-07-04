@@ -3,19 +3,14 @@ type StateKeyType = string;
 export type StateMachineConfig<
   ATM extends AvailableTransitionsMap = AvailableTransitionsMap,
   HandlerType extends Function = (...args) => void,
-  MasterType extends object = object,
 > = {
   atm: ATM;
   handler: HandlerType;
-  master: MasterType;
 };
 
 export type StateMachineLogicEntry<Config extends StateMachineConfig> = {
-  onEnter?: (
-    from: keyof Config["atm"] | null,
-    master?: Config["master"]
-  ) => void; // null is for initial state enter
-  onExit?: (to: keyof Config["atm"], master?: Config["master"]) => void;
+  onEnter?: (from: keyof Config["atm"] | null) => void; // null is for initial state enter
+  onExit?: (to: keyof Config["atm"]) => void;
   logicHandler?: Config["handler"];
   [SK: string]: any;
 };
@@ -28,15 +23,8 @@ export abstract class StateMachineLogicEntryBase<
   Config extends StateMachineConfig,
 > implements StateMachineLogicEntry<Config> {
   abstract logicHandler?: Config["handler"] | undefined;
-  abstract onEnter?:
-    | ((
-        from: keyof Config["atm"] | null,
-        master?: Config["master"] | undefined
-      ) => void)
-    | undefined;
-  abstract onExit?:
-    | ((to: keyof Config["atm"], master?: Config["master"] | undefined) => void)
-    | undefined;
+  abstract onEnter?: ((from: keyof Config["atm"] | null) => void) | undefined;
+  abstract onExit?: ((to: keyof Config["atm"]) => void) | undefined;
 }
 
 export class StateMachine<Config extends StateMachineConfig> {
@@ -45,8 +33,7 @@ export class StateMachine<Config extends StateMachineConfig> {
   constructor(
     initialState: keyof Config["atm"],
     private transitions: Config["atm"],
-    private logic: StateMachineLogic<Config>,
-    private master?: Config["master"] // origin instance
+    private logic: StateMachineLogic<Config>
   ) {
     this.currentState = initialState;
     this.transitions = transitions;
@@ -64,9 +51,9 @@ export class StateMachine<Config extends StateMachineConfig> {
   }
 
   doStateTransition(to: keyof Config["atm"]) {
-    console.info(
-      `transitioning ${(this.master as any)?.constructor?.name ?? ""}: from "${String(this.currentState)}" => "${String(to)}"`
-    );
+    // console.info(
+    //   `transitioning ${(this.master as any)?.constructor?.name ?? ""}: from "${String(this.currentState)}" => "${String(to)}"`
+    // );
 
     if (this.currentState == to) return;
     if (!this.canTransition(this.currentState, to)) {
@@ -75,9 +62,9 @@ export class StateMachine<Config extends StateMachineConfig> {
       );
     }
 
-    this.logic[this.currentState]?.onExit?.(to, this.master);
+    this.logic[this.currentState]?.onExit?.(to);
     const bufferState = this.currentState;
     this.currentState = to;
-    this.logic[to]?.onEnter?.(bufferState, this.master);
+    this.logic[to]?.onEnter?.(bufferState);
   }
 }

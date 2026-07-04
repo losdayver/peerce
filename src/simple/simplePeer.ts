@@ -1,10 +1,11 @@
+import { writeFileSync } from "node:fs";
 import { TransceiverIPv4 } from "@src/transport/transceiver";
 import {
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
   SimpleProtocolClientConfig,
 } from "./simpleProtocol";
-import { getResolver } from "@src/utils/promiseUtils";
+import { getResolver, sleep } from "@src/utils/promiseUtils";
 
 export class SimplePeer {
   transceiver: TransceiverIPv4;
@@ -44,9 +45,9 @@ export class SimplePeer {
   };
 
   /** Awaits PeerToPeerSessionRequest to be sent back from relay */
-  onReceivePeerSessionRequest = async (
+  private onReceivePeerSessionRequest = async (
     { address, port }: { address: string; port: number },
-    msg: string,
+    msg: Buffer,
     params: Required<SimpleProtocolClientConfig>
   ) => {
     const { distantTag, payload, relayAddr, relayPort } = params;
@@ -54,7 +55,7 @@ export class SimplePeer {
     // Ignore messages that come NOT from the relay
     if (!(address == relayAddr && port == relayPort)) return;
 
-    const receivedObj = JSON.parse(msg) as PeerToPeerSessionRequest;
+    const receivedObj = JSON.parse(msg.toString()) as PeerToPeerSessionRequest;
 
     // Ignore messages that have wrong distantTag
     if (receivedObj.distantTag !== distantTag) return;
@@ -81,12 +82,20 @@ export class SimplePeer {
 
     this.transceiver.eventEmitter.addListener(
       "onReceive",
-      ({ address, port }, msg) => {
+      async ({ address, port }, msg) => {
         if (
           address == receivedObj.distantAddress &&
           port == receivedObj.distantPort
-        )
-          console.log(msg); // todo message is received here
+        ) {
+          if (!params.outFile) console.log(msg.toString());
+          else writeFileSync(params.outFile, msg);
+          this.transceiver.eventEmitter.removeAllListeners();
+          this.transceiver.closeSession(address, port);
+
+          await sleep(2000);
+
+          this.transceiver.close();
+        }
       }
     );
 

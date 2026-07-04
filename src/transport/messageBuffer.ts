@@ -40,7 +40,7 @@ export interface DataMessage extends Message {
 }
 
 export class MessageBuffer {
-  static maxPayloadSize = 500;
+  static maxPayloadSize = 1000;
 
   static decode(buffer: Buffer): Message | null {
     const payloadSize = buffer.length - HEADER_SIZE;

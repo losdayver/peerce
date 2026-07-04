@@ -32,6 +32,12 @@ const cliOptions = {
   selfPort: {
     type: "string",
   },
+  fromFile: {
+    type: "string",
+  },
+  outFile: {
+    type: "string",
+  },
 } satisfies Record<keyof FullConfig, ParseArgsOptionDescriptor>;
 
 const { positionals, values } = parseArgs({
