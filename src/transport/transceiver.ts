@@ -109,6 +109,7 @@ export class TransceiverIPv4 {
   public eventEmitter = new EventEmitter<TransceiverEventEmitterMap>();
 
   public listen(self?: TransceiverIPv4Params["self"]) {
+    // todo refactor these
     if (this.stateMachine.currentState != "idle")
       throw new Error(`cannot listen on ${this.stateMachine.currentState}`);
 
@@ -123,19 +124,22 @@ export class TransceiverIPv4 {
     this.sessionMap.set(`${address}:${port}`, session);
     session.connect();
   }
-  public disconnect(address: string, port: number) {
+  public closeSession(address: string, port: number) {
     const session = this.sessionMap.get(`${address}:${port}`);
-    if (session) session.disconnect();
+    if (session) session.close();
   }
   public close() {
     this.stateMachine.doStateTransition("closing");
-  }
-  public __send(address: string, port: number, msg: any) {
-    this.socket?.send(msg, port, address);
   }
   public send(address: string, port: number, msg: any) {
     const session = this.sessionMap.get(`${address}:${port}`);
     if (!session) return;
     session.sendData(msg);
+  }
+  public __send(address: string, port: number, msg: any) {
+    this.socket?.send(msg, port, address);
+  }
+  public __deleteSessionFormMap(address: string, port: number) {
+    this.sessionMap.delete(`${address}:${port}`);
   }
 }

@@ -2,7 +2,9 @@ import { TransceiverIPv4 } from "@src/transport/transceiver";
 import {
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
+  SimpleProtocolClientConfig,
 } from "./simpleProtocol";
+import { getResolver } from "@src/utils/promiseUtils";
 
 export class SimplePeer {
   transceiver: TransceiverIPv4;
@@ -12,31 +14,24 @@ export class SimplePeer {
   }
 
   requestSessionViaRelay = async (
-    relayAddr: string,
-    relayPort: number,
-    selfTag: string,
-    distantTag: string,
-    payload?: string
+    params: Required<SimpleProtocolClientConfig>
   ) => {
+    const { distantTag, relayAddr, relayPort, selfTag } = params;
+
     this.transceiver.listen();
     this.transceiver.connect(relayAddr, relayPort);
 
-    console.log("connecting to relay");
-
-    await new Promise((res) => setTimeout(res, 2000)); // todo fix
-
-    let resolver: () => void;
-    let promise = new Promise((req) => (resolver = () => req(true)));
-
-    const listener = (address, port) => {
-      if (address == relayAddr && relayPort == port) resolver();
+    let { promise: connPromise, resolver: connResolver } = getResolver();
+    const listener = (address: string, port: number) => {
+      if (address == relayAddr && relayPort == port) connResolver.resolve?.();
     };
-
     this.transceiver.eventEmitter.addListener("onConnected", listener);
-
-    await promise;
-    console.log("ready to send");
+    await connPromise;
     this.transceiver.eventEmitter.removeListener("onConnected", listener);
+
+    this.transceiver.eventEmitter.addListener("onReceive", (addrObj, msg) =>
+      this.onReceivePeerSessionRequest(addrObj, msg, params)
+    );
 
     this.transceiver.send(
       relayAddr,
@@ -46,33 +41,60 @@ export class SimplePeer {
         distantTag,
       } satisfies PeerToRelaySessionRequest)
     );
+  };
 
-    promise = new Promise((req) => (resolver = () => req(true)));
+  /** Awaits PeerToPeerSessionRequest to be sent back from relay */
+  onReceivePeerSessionRequest = async (
+    { address, port }: { address: string; port: number },
+    msg: string,
+    params: Required<SimpleProtocolClientConfig>
+  ) => {
+    const { distantTag, payload, relayAddr, relayPort } = params;
+
+    // Ignore messages that come NOT from the relay
+    if (!(address == relayAddr && port == relayPort)) return;
+
+    const receivedObj = JSON.parse(msg) as PeerToPeerSessionRequest;
+
+    // Ignore messages that have wrong distantTag
+    if (receivedObj.distantTag !== distantTag) return;
+    this.transceiver.connect(
+      receivedObj.distantAddress,
+      receivedObj.distantPort
+    );
+
+    // Await connection from peer
+    let { promise: connPromise, resolver: connResolver } = getResolver();
+    const listener = (address: string, port: number) => {
+      if (
+        address == receivedObj.distantAddress &&
+        port == receivedObj.distantPort
+      )
+        connResolver.resolve?.();
+    };
+    this.transceiver.eventEmitter.addListener("onConnected", listener);
+    await connPromise;
+    this.transceiver.eventEmitter.removeListener("onConnected", listener);
+
+    // Relay connection is no longer necessary
+    this.transceiver.closeSession(relayAddr, relayPort);
 
     this.transceiver.eventEmitter.addListener(
       "onReceive",
-      async ({ address, port }, msg) => {
-        if (!(address == relayAddr && relayPort == port)) return;
-        const obj = JSON.parse(msg) as PeerToPeerSessionRequest;
-        if (obj.distantTag !== distantTag) return;
-        this.transceiver.connect(obj.distantAddress, obj.distantPort);
-        // this.transceiver.disconnect(relayAddr, relayPort); // todo
-
-        this.transceiver.eventEmitter.addListener(
-          "onReceive",
-          ({ address, port }, msg) => {
-            if (address == obj.distantAddress && port == obj.distantPort)
-              console.log(msg);
-          }
-        );
-
-        await new Promise((res) => setTimeout(res, 10000)); // todo fix
-
-        if (payload)
-          this.transceiver.send(obj.distantAddress, obj.distantPort, payload);
-
-        // todo disconnect from relay
+      ({ address, port }, msg) => {
+        if (
+          address == receivedObj.distantAddress &&
+          port == receivedObj.distantPort
+        )
+          console.log(msg); // todo message is received here
       }
     );
+
+    if (payload)
+      this.transceiver.send(
+        receivedObj.distantAddress,
+        receivedObj.distantPort,
+        payload
+      );
   };
 }

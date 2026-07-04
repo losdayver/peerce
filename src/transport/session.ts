@@ -55,7 +55,7 @@ export class Session {
   private sessionStateLogic: SessionStateMachineLogic = {
     connecting: {
       retriesInterval: null,
-      retriesNumSeconds: 5,
+      retriesNumSeconds: 1,
       onEnter(_, master) {
         let retries = 10;
         this.retriesInterval = setInterval(() => {
@@ -87,6 +87,18 @@ export class Session {
       },
     } satisfies SessionStateMachineLogicEntry,
     connected: new ConnectedState(this),
+    closing: {
+      onEnter: () => {
+        const [msg] = MessageBuffer.construct({ type: MessageType.FIN });
+        this.transceiverIPv4.__send(this.address, this.port, msg);
+        this.stateMachine.doStateTransition("closed");
+      },
+    },
+    closed: {
+      onEnter: () => {
+        this.transceiverIPv4.__deleteSessionFormMap(this.address, this.port);
+      },
+    },
   };
 
   sendOne(message: Message) {
@@ -120,9 +132,8 @@ export class Session {
     this.stateMachine.doStateTransition("connecting");
   }
 
-  disconnect() {
-    // todo retries
-    this.transceiverIPv4.__send(this.address, this.port, "disconnect me!");
+  close() {
+    this.stateMachine.doStateTransition("closing");
   }
 }
 
@@ -205,10 +216,8 @@ class ConnectedState extends StateMachineLogicEntryBase<SessionStateMachineConfi
       case MessageType.DATA_ACK:
         this.sentMap;
         break;
-      case MessageType.KEEP_ALIVE:
-        console.log(
-          `received from ${master.address}:${master.port}: KEEP ALIVE`
-        );
+      case MessageType.FIN:
+        this.session.close();
     }
   };
 }
