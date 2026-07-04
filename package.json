@@ -2,7 +2,9 @@
   "name": "p2p_messenger",
   "version": "1.0.0",
   "description": "",
-  "scripts": {},
+  "scripts": {
+    "complete-build": "npm ci;tsc"
+  },
   "keywords": [],
   "author": "",
   "license": "MIT",
