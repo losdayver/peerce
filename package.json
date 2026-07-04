@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "complete-build": "npm ci;tsc"
+    "complete-build": "npm i && npx tsc && npm pack"
   },
   "keywords": [],
   "author": "",
