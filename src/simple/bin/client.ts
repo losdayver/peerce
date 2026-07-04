@@ -1,4 +1,4 @@
-#!node
+#!/usr/bin/env node
 import { register } from "module-alias/register";
 register;
 import { SimplePeer } from "../simplePeer";
