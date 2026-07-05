@@ -7,3 +7,12 @@ export const getResolver = () => {
 };
 
 export const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
+export const once = <T>(emitter: any, event: string) =>
+  new Promise<T>((resolve) => {
+    const listener = (payload: T) => {
+      emitter.off(event, listener);
+      resolve(payload);
+    };
+    emitter.on(event, listener);
+  });

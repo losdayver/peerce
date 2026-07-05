@@ -1,10 +1,9 @@
-import { writeFileSync } from "node:fs";
 import { TransceiverIPv4 } from "@src/transport/transceiver";
 import {
   PeerToPeerSessionRequest,
   SimpleProtocolClientConfig,
 } from "../simpleProtocol";
-import { getResolver, sleep } from "@src/utils/promiseUtils";
+import { once } from "@src/utils/promiseUtils";
 import { StateMachine } from "@src/utils/stateMachine";
 import {
   SimplePeerStateMachine,
@@ -15,11 +14,17 @@ import {
 import { ConnectingToRelay } from "./logic/connectingToRelay";
 import { ConnectingToPeer } from "./logic/connectingToPeer";
 import { ConnectedToPeer } from "./logic/connectedToPeer";
+import { EventEmitter } from "node:stream";
+
+interface SimplePeerEventEmitterMap {
+  onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
+}
 
 export class SimplePeer {
   transceiver: TransceiverIPv4;
   stateMachine: SimplePeerStateMachine;
   initialParams: Required<SimpleProtocolClientConfig>;
+  eventEmitter = new EventEmitter<SimplePeerEventEmitterMap>();
 
   constructor(initialParams: Required<SimpleProtocolClientConfig>) {
     this.transceiver = new TransceiverIPv4();
@@ -38,69 +43,13 @@ export class SimplePeer {
   };
 
   requestSessionViaRelay = async () => {
+    const sessionPromise = once<PeerToPeerSessionRequest>(
+      this.eventEmitter,
+      "onConnectedToPeer"
+    );
     await this.stateMachine.doStateTransition("connectingToRelay");
+    return await sessionPromise;
   };
 
-  /** Awaits PeerToPeerSessionRequest to be sent back from relay */
-  private onReceivePeerSessionRequest = async (
-    { address, port }: { address: string; port: number },
-    msg: Buffer,
-    params: Required<SimpleProtocolClientConfig>
-  ) => {
-    const { distantTag, payload, relayAddr, relayPort } = params;
-
-    // Ignore messages that come NOT from the relay
-    if (!(address == relayAddr && port == relayPort)) return;
-
-    const receivedObj = JSON.parse(msg.toString()) as PeerToPeerSessionRequest;
-
-    // Ignore messages that have wrong distantTag
-    if (receivedObj.distantTag !== distantTag) return;
-    await this.transceiver.connect(
-      receivedObj.distantAddress,
-      receivedObj.distantPort
-    );
-
-    // Await connection from peer
-    let { promise: connPromise, resolver: connResolver } = getResolver();
-    const listener = (address: string, port: number) => {
-      if (
-        address == receivedObj.distantAddress &&
-        port == receivedObj.distantPort
-      )
-        connResolver.resolve?.();
-    };
-    this.transceiver.eventEmitter.addListener("onConnected", listener);
-    await connPromise;
-    this.transceiver.eventEmitter.removeListener("onConnected", listener);
-
-    // Relay connection is no longer necessary
-    this.transceiver.closeSession(relayAddr, relayPort);
-
-    this.transceiver.eventEmitter.addListener(
-      "onReceive",
-      async ({ address, port }, msg) => {
-        if (
-          address == receivedObj.distantAddress &&
-          port == receivedObj.distantPort
-        ) {
-          if (!params.outFile) console.log(msg.toString());
-          else writeFileSync(params.outFile, msg);
-          this.transceiver.eventEmitter.removeAllListeners();
-          this.transceiver.closeSession(address, port);
-
-          await sleep(2000);
-
-          this.transceiver.close();
-        }
-      }
-    );
-
-    if (payload)
-      this.transceiver.send(
-        receivedObj.distantAddress,
-        receivedObj.distantPort,
-        payload
-      );
-  };
+  // todo send method
 }

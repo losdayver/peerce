@@ -87,6 +87,7 @@ export class ConnectingToPeer extends StateMachineLogicEntryBase<SimplePeerState
   };
   onExit = () => {
     const { relayAddr, relayPort } = this.simplePeer.initialParams;
+    logInfo(`closed relay connection`);
     this.simplePeer.transceiver.closeSession(relayAddr, relayPort);
   };
   logicHandler = () => {};

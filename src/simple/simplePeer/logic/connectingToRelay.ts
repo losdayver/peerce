@@ -14,7 +14,7 @@ export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStat
 
   onEnter = async () => {
     const { initialParams, transceiver, stateMachine } = this.simplePeer;
-    const { distantTag, relayAddr, relayPort } = initialParams;
+    const { relayAddr, relayPort } = initialParams;
 
     logInfo("firing socket");
 
@@ -30,7 +30,7 @@ export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStat
     transceiver.eventEmitter.addListener("onConnected", listener);
     await connPromise;
 
-    logInfo(`connection to ${relayAddr}:${relayPort} successful!`);
+    logInfo(`connected to relay ${relayAddr}:${relayPort}`);
 
     transceiver.eventEmitter.removeListener("onConnected", listener);
 

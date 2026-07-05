@@ -11,6 +11,7 @@ import { readFileSync } from "node:fs";
 if (envConfig.fromFile) envConfig.payload = readFileSync(envConfig.fromFile);
 
 void (async () => {
-  const simpleClient = new SimplePeer(envConfig as Required<FullConfig>);
-  await simpleClient.requestSessionViaRelay();
+  const simplePeer = new SimplePeer(envConfig as Required<FullConfig>);
+  const res = await simplePeer.requestSessionViaRelay();
+  console.log(res);
 })();
