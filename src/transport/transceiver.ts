@@ -61,7 +61,7 @@ export class TransceiverIPv4 {
     const socket = this.socket!;
 
     socket.on("error", () => {
-      this.stateMachine.doStateTransition("error");
+      void this.stateMachine.doStateTransition("error");
     });
 
     socket.on("message", (msg, { address, port }) =>
@@ -79,7 +79,7 @@ export class TransceiverIPv4 {
     if (!session && msg?.type !== MessageType.FIN) {
       session = new Session(this, address, port);
       this.sessionMap.set(key, session);
-      session.connect();
+      void session.connect();
     }
 
     session?.handleMessage(msg);
@@ -98,7 +98,7 @@ export class TransceiverIPv4 {
         onEnter: () => {
           this.socket?.removeAllListeners();
           this.socket?.close();
-          this.stateMachine.doStateTransition("closed");
+          void this.stateMachine.doStateTransition("closed");
         },
       },
 
@@ -111,13 +111,13 @@ export class TransceiverIPv4 {
 
   public eventEmitter = new EventEmitter<TransceiverEventEmitterMap>();
 
-  public listen(self?: TransceiverIPv4Params["self"]) {
+  public async listen(self?: TransceiverIPv4Params["self"]) {
     // todo refactor these
     if (this.stateMachine.currentState != "idle")
       throw new Error(`cannot listen on ${this.stateMachine.currentState}`);
 
     this.selfAddress = self;
-    this.stateMachine.doStateTransition("listening");
+    await this.stateMachine.doStateTransition("listening");
   }
   public connect(address: string, port: number) {
     if (this.stateMachine.currentState != "listening")
@@ -129,10 +129,10 @@ export class TransceiverIPv4 {
   }
   public closeSession(address: string, port: number) {
     const session = this.sessionMap.get(`${address}:${port}`);
-    if (session) session.close();
+    if (session) void session.close();
   }
   public close() {
-    this.stateMachine.doStateTransition("closing");
+    void this.stateMachine.doStateTransition("closing");
   }
   public send(address: string, port: number, msg: string | Buffer) {
     const session = this.sessionMap.get(`${address}:${port}`);

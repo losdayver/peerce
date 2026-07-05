@@ -14,7 +14,7 @@ export class SimpleRelay {
 
   constructor(address: string, port: number) {
     this.transceiver = new TransceiverIPv4();
-    this.transceiver.listen({ address, port });
+    void this.transceiver.listen({ address, port });
 
     this.transceiver.eventEmitter.on("onReceive", this.onReceiveFromPeer);
   }
@@ -24,6 +24,8 @@ export class SimpleRelay {
     msg: Buffer
   ) => {
     // todo zod or something
+    console.log("asdasadad");
+
     const obj = JSON.parse(msg.toString()) as PeerToRelaySessionRequest;
     console.log("adding new record to target map", addrObj, msg);
 

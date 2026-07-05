@@ -9,8 +9,11 @@ export type StateMachineConfig<
 };
 
 export type StateMachineLogicEntry<Config extends StateMachineConfig> = {
-  onEnter?: (from: keyof Config["atm"] | null) => void; // null is for initial state enter
-  onExit?: (to: keyof Config["atm"]) => void;
+  onEnter?: (
+    from: keyof Config["atm"] | null,
+    params?: any
+  ) => void | Promise<void>; // null is for initial state enter
+  onExit?: (to: keyof Config["atm"]) => void | Promise<void>;
   logicHandler?: Config["handler"];
   [SK: string]: any;
 };
@@ -22,9 +25,12 @@ export type StateMachineLogic<Config extends StateMachineConfig> = {
 export abstract class StateMachineLogicEntryBase<
   Config extends StateMachineConfig,
 > implements StateMachineLogicEntry<Config> {
-  abstract logicHandler?: Config["handler"] | undefined;
-  abstract onEnter?: ((from: keyof Config["atm"] | null) => void) | undefined;
-  abstract onExit?: ((to: keyof Config["atm"]) => void) | undefined;
+  abstract logicHandler?: Config["handler"];
+  abstract onEnter?: (
+    from: keyof Config["atm"] | null,
+    params?: any
+  ) => void | Promise<void>;
+  abstract onExit?: (to: keyof Config["atm"]) => void | Promise<void>;
 }
 
 export class StateMachine<Config extends StateMachineConfig> {
@@ -38,7 +44,7 @@ export class StateMachine<Config extends StateMachineConfig> {
     this.currentState = initialState;
     this.transitions = transitions;
     this.logic = logic;
-    this.logic[this.currentState]?.onEnter?.(null);
+    void this.logic[this.currentState]?.onEnter?.(null);
   }
 
   fireLogicHandler(...args: Parameters<Config["handler"]>) {
@@ -50,9 +56,12 @@ export class StateMachine<Config extends StateMachineConfig> {
     return this.transitions[from].includes(to as string);
   }
 
-  doStateTransition(to: keyof Config["atm"]) {
+  async doStateTransition<Params = unknown, ReturnT = unknown>(
+    to: keyof Config["atm"],
+    params?: Params
+  ) {
     // console.info(
-    //   `transitioning ${(this.master as any)?.constructor?.name ?? ""}: from "${String(this.currentState)}" => "${String(to)}"`
+    //   `transitioning: from "${String(this.currentState)}" => "${String(to)}"`
     // );
 
     if (this.currentState == to) return;
@@ -62,9 +71,9 @@ export class StateMachine<Config extends StateMachineConfig> {
       );
     }
 
-    this.logic[this.currentState]?.onExit?.(to);
+    await this.logic[this.currentState]?.onExit?.(to);
     const bufferState = this.currentState;
     this.currentState = to;
-    this.logic[to]?.onEnter?.(bufferState);
+    return (await this.logic[to]?.onEnter?.(bufferState, params)) as ReturnT;
   }
 }

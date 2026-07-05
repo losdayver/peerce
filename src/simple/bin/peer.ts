@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { register } from "module-alias/register";
 register;
-import { SimplePeer } from "../simplePeer";
+import { SimplePeer } from "../simplePeer/simplePeer";
 import { envConfig, FullConfig } from "@src/utils/configConstructor";
 import { readFileSync } from "node:fs";
 
@@ -11,6 +11,6 @@ import { readFileSync } from "node:fs";
 if (envConfig.fromFile) envConfig.payload = readFileSync(envConfig.fromFile);
 
 void (async () => {
-  const simpleClient = new SimplePeer();
-  await simpleClient.requestSessionViaRelay(envConfig as Required<FullConfig>);
+  const simpleClient = new SimplePeer(envConfig as Required<FullConfig>);
+  await simpleClient.requestSessionViaRelay();
 })();

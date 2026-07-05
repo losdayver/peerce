@@ -2,46 +2,43 @@ import { writeFileSync } from "node:fs";
 import { TransceiverIPv4 } from "@src/transport/transceiver";
 import {
   PeerToPeerSessionRequest,
-  PeerToRelaySessionRequest,
   SimpleProtocolClientConfig,
-} from "./simpleProtocol";
+} from "../simpleProtocol";
 import { getResolver, sleep } from "@src/utils/promiseUtils";
+import { StateMachine } from "@src/utils/stateMachine";
+import {
+  SimplePeerStateMachine,
+  SimplePeerStateMachineConfig,
+  SimplePeerStateMachineLogic,
+  simplePeerStateTransitionMap,
+} from "./stateMeta";
+import { ConnectingToRelay } from "./logic/connectingToRelay";
+import { ConnectingToPeer } from "./logic/connectingToPeer";
+import { ConnectedToPeer } from "./logic/connectedToPeer";
 
 export class SimplePeer {
   transceiver: TransceiverIPv4;
+  stateMachine: SimplePeerStateMachine;
+  initialParams: Required<SimpleProtocolClientConfig>;
 
-  constructor() {
+  constructor(initialParams: Required<SimpleProtocolClientConfig>) {
     this.transceiver = new TransceiverIPv4();
+    this.stateMachine = new StateMachine<SimplePeerStateMachineConfig>(
+      "idle",
+      simplePeerStateTransitionMap,
+      this.simplePeerStateLogic
+    );
+    this.initialParams = initialParams;
   }
 
-  requestSessionViaRelay = async (
-    params: Required<SimpleProtocolClientConfig>
-  ) => {
-    const { distantTag, relayAddr, relayPort, selfTag } = params;
+  simplePeerStateLogic: SimplePeerStateMachineLogic = {
+    connectingToRelay: new ConnectingToRelay(this),
+    connectingToPeer: new ConnectingToPeer(this),
+    connectedToPeer: new ConnectedToPeer(this),
+  };
 
-    this.transceiver.listen();
-    this.transceiver.connect(relayAddr, relayPort);
-
-    let { promise: connPromise, resolver: connResolver } = getResolver();
-    const listener = (address: string, port: number) => {
-      if (address == relayAddr && relayPort == port) connResolver.resolve?.();
-    };
-    this.transceiver.eventEmitter.addListener("onConnected", listener);
-    await connPromise;
-    this.transceiver.eventEmitter.removeListener("onConnected", listener);
-
-    this.transceiver.eventEmitter.addListener("onReceive", (addrObj, msg) =>
-      this.onReceivePeerSessionRequest(addrObj, msg, params)
-    );
-
-    this.transceiver.send(
-      relayAddr,
-      relayPort,
-      JSON.stringify({
-        selfTag,
-        distantTag,
-      } satisfies PeerToRelaySessionRequest)
-    );
+  requestSessionViaRelay = async () => {
+    await this.stateMachine.doStateTransition("connectingToRelay");
   };
 
   /** Awaits PeerToPeerSessionRequest to be sent back from relay */
@@ -59,7 +56,7 @@ export class SimplePeer {
 
     // Ignore messages that have wrong distantTag
     if (receivedObj.distantTag !== distantTag) return;
-    this.transceiver.connect(
+    await this.transceiver.connect(
       receivedObj.distantAddress,
       receivedObj.distantPort
     );

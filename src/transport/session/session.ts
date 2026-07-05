@@ -60,10 +60,10 @@ export class Session {
   }
 
   connect() {
-    this.stateMachine.doStateTransition("connecting");
+    void this.stateMachine.doStateTransition("connecting");
   }
 
-  close() {
-    this.stateMachine.doStateTransition("closing");
+  async close() {
+    await this.stateMachine.doStateTransition("closing");
   }
 }

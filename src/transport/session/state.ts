@@ -106,7 +106,7 @@ export class ConnectedState extends StateMachineLogicEntryBase<SessionStateMachi
     clearInterval(this.keepAliveInterval);
   };
 
-  logicHandler = (message: Message) => {
+  logicHandler = async (message: Message) => {
     switch (message.type) {
       case MessageType.DATA:
         // todo check all fields are satisfied for message to me DataMessage
@@ -117,7 +117,7 @@ export class ConnectedState extends StateMachineLogicEntryBase<SessionStateMachi
         break;
       }
       case MessageType.FIN:
-        this.session.close();
+        await this.session.close();
     }
   };
 }
@@ -133,21 +133,22 @@ export class ConnectingState extends StateMachineLogicEntryBase<SessionStateMach
   onEnter = () => {
     let retries = 10;
     clearInterval(this.retriesInterval);
-    this.retriesInterval = setInterval(() => {
+    this.retriesInterval = setInterval(async () => {
       this.session.sendOne({ type: MessageType.HELLO });
       retries -= 1;
-      if (retries <= 0) this.session.stateMachine.doStateTransition("closing");
+      if (retries <= 0)
+        await this.session.stateMachine.doStateTransition("closing");
     }, this.retriesNumSeconds * 1000);
   };
 
-  logicHandler = (message) => {
+  logicHandler = async (message) => {
     switch (message.type) {
       case MessageType.HELLO:
         this.session.sendOne({ type: MessageType.HELLO_ACK });
         return;
       case MessageType.HELLO_ACK:
         this.session.sendOne({ type: MessageType.HELLO_ACK });
-        this.session.stateMachine.doStateTransition("connected");
+        await this.session.stateMachine.doStateTransition("connected");
         return;
     }
   };
@@ -162,16 +163,16 @@ export class ClosingState extends StateMachineLogicEntryBase<SessionStateMachine
     super();
   }
 
-  logicHandler?: () => {};
-  onExit?: () => {};
-  onEnter = (_) => {
+  logicHandler = () => {};
+  onExit = () => {};
+  onEnter = async (_) => {
     const [msg] = MessageBuffer.construct({ type: MessageType.FIN });
     this.session.transceiverIPv4.__send(
       this.session.address,
       this.session.port,
       msg
     );
-    this.session.stateMachine.doStateTransition("closed");
+    await this.session.stateMachine.doStateTransition("closed");
   };
 }
 
@@ -180,8 +181,8 @@ export class ClosedState extends StateMachineLogicEntryBase<SessionStateMachineC
     super();
   }
 
-  logicHandler?: () => {};
-  onExit?: () => {};
+  logicHandler = () => {};
+  onExit = () => {};
   onEnter = () => {
     this.session.transceiverIPv4.__deleteSessionFormMap(
       this.session.address,
