@@ -1,12 +1,12 @@
 import { parseArgs, ParseArgsOptionDescriptor } from "node:util";
 import { argv } from "node:process";
 import {
-  SimpleProtocolClientConfig,
+  SimpleProtocolConfig,
   SimpleProtocolRelayConfig,
 } from "@src/simple/simpleProtocol";
 
 export interface FullConfig
-  extends SimpleProtocolClientConfig, SimpleProtocolRelayConfig {}
+  extends SimpleProtocolConfig, SimpleProtocolRelayConfig {}
 
 export const envConfig: FullConfig = {};
 
@@ -35,7 +35,7 @@ const cliOptions = {
   fromFile: {
     type: "string",
   },
-  outFile: {
+  outDir: {
     type: "string",
   },
 } satisfies Record<keyof FullConfig, ParseArgsOptionDescriptor>;

@@ -1,8 +1,10 @@
 import { TransceiverIPv4 } from "@src/transport/transceiver";
 import {
+  PeerToPeerMessageDescriptor,
   PeerToPeerSessionRequest,
-  SimpleProtocolClientConfig,
-} from "../simpleProtocol";
+  SimpleProtocolConfig,
+  SimpleProtocolPeerConfig,
+} from "@src/simple/simpleProtocol";
 import { once } from "@src/utils/promiseUtils";
 import { StateMachine } from "@src/utils/stateMachine";
 import {
@@ -13,20 +15,24 @@ import {
 } from "./stateMeta";
 import { ConnectingToRelay } from "./logic/connectingToRelay";
 import { ConnectingToPeer } from "./logic/connectingToPeer";
-import { ConnectedToPeer } from "./logic/connectedToPeer";
+import {
+  ConnectedToPeer,
+  ConnectedToPeerLogicHandler,
+} from "./logic/connectedToPeer";
 import { EventEmitter } from "node:stream";
 
 interface SimplePeerEventEmitterMap {
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
+  onFullMessage: [{ buffer: Buffer; fileName: string }];
 }
 
 export class SimplePeer {
   transceiver: TransceiverIPv4;
   stateMachine: SimplePeerStateMachine;
-  initialParams: Required<SimpleProtocolClientConfig>;
+  initialParams: Required<SimpleProtocolPeerConfig>;
   eventEmitter = new EventEmitter<SimplePeerEventEmitterMap>();
 
-  constructor(initialParams: Required<SimpleProtocolClientConfig>) {
+  constructor(initialParams: Required<SimpleProtocolPeerConfig>) {
     this.transceiver = new TransceiverIPv4();
     this.stateMachine = new StateMachine<SimplePeerStateMachineConfig>(
       "idle",
@@ -49,6 +55,15 @@ export class SimplePeer {
     );
     await this.stateMachine.doStateTransition("connectingToRelay");
     return await sessionPromise;
+  };
+
+  sendData = ({ fileName, payload }: PeerToPeerMessageDescriptor) => {
+    if (this.stateMachine.currentState !== "connectedToPeer")
+      throw new Error(`Cannot send data on ${this.stateMachine.currentState}`);
+    (this.stateMachine.fireLogicHandler as ConnectedToPeerLogicHandler)({
+      fileName,
+      payload,
+    });
   };
 
   // todo send method
