@@ -1,5 +1,7 @@
 type StateKeyType = string;
 
+/** Declarations */
+
 export type StateMachineConfig<
   ATM extends AvailableTransitionsMap = AvailableTransitionsMap,
   HandlerType extends Function = (...args) => void,
@@ -17,7 +19,9 @@ export type StateMachineLogicEntry<Config extends StateMachineConfig> = {
   logicHandler?: Config["handler"];
   [SK: string]: any;
 };
+
 export type AvailableTransitionsMap = Record<StateKeyType, StateKeyType[]>;
+
 export type StateMachineLogic<Config extends StateMachineConfig> = {
   [K in keyof Config["atm"]]?: StateMachineLogicEntry<Config>;
 };
@@ -25,13 +29,25 @@ export type StateMachineLogic<Config extends StateMachineConfig> = {
 export abstract class StateMachineLogicEntryBase<
   Config extends StateMachineConfig,
 > implements StateMachineLogicEntry<Config> {
-  abstract logicHandler?: Config["handler"];
-  abstract onEnter?: (
+  logicHandler?: Config["handler"];
+  onEnter?: (
     from: keyof Config["atm"] | null,
     params?: any
   ) => void | Promise<void>;
-  abstract onExit?: (to: keyof Config["atm"]) => void | Promise<void>;
+  onExit?: (to: keyof Config["atm"]) => void | Promise<void>;
 }
+
+/** Use this to construct complex types */
+export type InferStateMachineTypes<Config extends StateMachineConfig> = {
+  StateMachine: StateMachine<Config>;
+  Logic: StateMachineLogic<Config>;
+  LogicEntry: StateMachineLogicEntry<Config>;
+  LogicHandler: Config["handler"];
+  ATM: Config["atm"];
+  Config: Config;
+};
+
+/** Implementations */
 
 export class StateMachine<Config extends StateMachineConfig> {
   public currentState: keyof Config["atm"];

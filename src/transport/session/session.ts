@@ -1,16 +1,19 @@
 import { StateMachine } from "@src/utils/stateMachine";
-import { Message, MessageBuffer, MessageType } from "../messageBuffer";
-import { TransceiverIPv4 } from "../transceiver";
 import {
-  ClosedState,
-  ClosingState,
-  ConnectedState,
-  ConnectingState,
-  SessionStateMachine,
-  SessionStateMachineConfig,
-  SessionStateMachineLogic,
+  Message,
+  MessageBuffer,
+  MessageType,
+} from "@src/transport/messageBuffer";
+import { TransceiverIPv4 } from "@src/transport/transceiver";
+import {
+  SessionLogicHandlerAction,
+  SessionSMTypes,
   sessionStateTransitionMap,
-} from "./state";
+} from "@src/transport/session/sessionMeta";
+import { ConnectingState } from "./logic/connectingState";
+import { ConnectedState } from "./logic/connectedState";
+import { ClosingState } from "./logic/closingState";
+import { ClosedState } from "./logic/closedState";
 
 export class Session {
   constructor(
@@ -18,16 +21,16 @@ export class Session {
     public address: string,
     public port: number
   ) {
-    this.stateMachine = new StateMachine<SessionStateMachineConfig>(
+    this.stateMachine = new StateMachine<SessionSMTypes["Config"]>(
       "idle",
       sessionStateTransitionMap,
       this.sessionStateLogic
     );
   }
 
-  stateMachine: SessionStateMachine;
+  stateMachine: SessionSMTypes["StateMachine"];
 
-  private sessionStateLogic: SessionStateMachineLogic = {
+  private sessionStateLogic: SessionSMTypes["Logic"] = {
     connecting: new ConnectingState(this),
     connected: new ConnectedState(this),
     closing: new ClosingState(this),
@@ -56,14 +59,19 @@ export class Session {
 
   handleMessage(msg?: Message | null) {
     if (!msg) return;
-    this.stateMachine.fireLogicHandler(msg);
+    this.stateMachine.fireLogicHandler({
+      action: SessionLogicHandlerAction.MESSAGE,
+      payload: msg,
+    });
   }
 
-  connect() {
+  connect = () => {
     void this.stateMachine.doStateTransition("connecting");
-  }
+    // todo await for connection event
+  };
 
-  async close() {
-    await this.stateMachine.doStateTransition("closing");
-  }
+  close = () => {
+    void this.stateMachine.doStateTransition("closing");
+    // todo await for closed event
+  };
 }
