@@ -42,12 +42,6 @@ export class ConnectedState extends StateMachineLogicEntryBase<
       this.dataAckCollector.get(message.uid) ??
       this.dataAckCollector.set(message.uid, new Set()).get(message.uid);
 
-    // console.log(
-    //   "message.uid in buffersToSendCache",
-    //   !!this.buffersToSendCache.get(message.uid)
-    // );
-    console.log(message.uid);
-
     const hasAckChecker = () => {
       for (let i = 0; i < message.total; i++) {
         const hasAck = set!.has(i);

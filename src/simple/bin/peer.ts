@@ -22,6 +22,6 @@ void (async () => {
   if (envConfig.payload)
     simplePeer.sendData({
       payload: envConfig.payload,
-      fileName: basename(envConfig.fromFile!),
+      fileName: envConfig.fromFile ? basename(envConfig.fromFile) : undefined,
     });
 })();
