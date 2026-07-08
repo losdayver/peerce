@@ -43,6 +43,7 @@ export class ConnectedState extends StateMachineLogicEntryBase<
       this.dataAckCollector.get(message.uid) ??
       this.dataAckCollector.set(message.uid, new Set()).get(message.uid);
 
+    // todo run this independently. receiving ack should only reset timeout for next check
     const hasAckChecker = () => {
       for (let i = 0; i < message.total; i++) {
         const hasAck = set!.has(i);
