@@ -41,27 +41,24 @@ export class Session {
     this.transceiverIPv4.__send(
       this.address,
       this.port,
-      MessageBuffer.construct(message)[0]
+      MessageBuffer.construct(message).buffers[0]
     );
   }
 
-  sendData(msg: string | Buffer) {
-    const msgs = MessageBuffer.construct({
-      type: MessageType.DATA,
-      payload: typeof msg == "string" ? Buffer.from(msg) : msg,
+  sendData(raw: string | Buffer) {
+    if (this.stateMachine.currentState != "connected")
+      throw new Error("Cannot send while not connected");
+    this.stateMachine.fireLogicHandler({
+      action: SessionLogicHandlerAction.SEND_DATA,
+      payload: raw,
     });
-
-    // todo continuous sender. maybe put the logic into ConnectedState
-    for (const msg of msgs) {
-      this.transceiverIPv4.__send(this.address, this.port, msg);
-    }
   }
 
-  handleMessage(msg?: Message | null) {
-    if (!msg) return;
+  handleMessage(message?: Message | null) {
+    if (!message) return;
     this.stateMachine.fireLogicHandler({
       action: SessionLogicHandlerAction.MESSAGE,
-      payload: msg,
+      payload: message,
     });
   }
 

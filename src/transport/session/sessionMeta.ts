@@ -16,13 +16,18 @@ export const sessionStateTransitionMap = {
 
 export const enum SessionLogicHandlerAction {
   MESSAGE = 1,
-  
+  SEND_DATA = 2,
 }
 
-type SessionLogicHandlerPairs = {
-  action: SessionLogicHandlerAction.MESSAGE;
-  payload: Message;
-};
+type SessionLogicHandlerPairs =
+  | {
+      action: SessionLogicHandlerAction.MESSAGE;
+      payload: Message;
+    }
+  | {
+      action: SessionLogicHandlerAction.SEND_DATA;
+      payload: string | Buffer;
+    };
 
 type SessionSMConfig = StateMachineConfig<
   typeof sessionStateTransitionMap,

@@ -51,12 +51,16 @@ export class MessageBuffer {
 
   static decode(buffer: Buffer): Message | null {
     const payloadSize = buffer.length - HEADER_SIZE;
+    const checksumPos = HEADER_SIZE - SUM_SIZE;
 
-    const checksum = buffer.readUIntBE(HEADER_SIZE - SUM_SIZE, SUM_SIZE);
-    buffer.writeUIntBE(0, HEADER_SIZE - SUM_SIZE, SUM_SIZE);
-    const initialChecksum = crc32(buffer);
+    const expectedChecksum = buffer.readUIntBE(checksumPos, SUM_SIZE);
 
-    if (checksum != initialChecksum) return null;
+    // не меняем исходный buffer
+    const tmp = Buffer.from(buffer);
+    tmp.writeUIntBE(0, checksumPos, SUM_SIZE);
+
+    const initialChecksum = crc32(tmp);
+    if (expectedChecksum !== initialChecksum) return null;
 
     const message: { [K in keyof Message]: Message[K] | null } = {
       type: null,
@@ -72,15 +76,20 @@ export class MessageBuffer {
 
     message.type = buffer.readUIntBE(offset, TYPE_SIZE);
     offset += TYPE_SIZE;
+
     message.uid = buffer.readUIntBE(offset, UID_SIZE);
     offset += UID_SIZE;
+
     message.seq = buffer.readUIntBE(offset, SEQ_SIZE);
     offset += SEQ_SIZE;
+
     message.ack = buffer.readUIntBE(offset, ACK_SIZE);
     offset += ACK_SIZE;
+
     message.total = buffer.readUIntBE(offset, TOTAL_SIZE);
     offset += TOTAL_SIZE;
-    message.checksum = checksum;
+
+    message.checksum = expectedChecksum;
     offset += SUM_SIZE;
 
     if (message.payload) {
@@ -91,9 +100,9 @@ export class MessageBuffer {
   }
 
   static construct(message: Message) {
-    const { type, payload, ack } = message;
+    let { type, payload, ack, total } = message;
 
-    const messages: Buffer[] = [];
+    const buffers: Buffer[] = [];
     const uid = randomBytes(UID_SIZE).readUIntBE(0, UID_SIZE);
 
     let seq = 0;
@@ -102,7 +111,7 @@ export class MessageBuffer {
       ? chunkBuffer(payload, MessageBuffer.maxPayloadSize)
       : [Buffer.alloc(0)];
 
-    const total = chunks.length;
+    total ??= chunks.length;
 
     for (const chunk of chunks) {
       const buffer = Buffer.alloc(HEADER_SIZE + chunk.length);
@@ -128,10 +137,10 @@ export class MessageBuffer {
       const checkSum = crc32(buffer);
       buffer.writeUIntBE(checkSum, sumOffset, SUM_SIZE);
 
-      messages.push(buffer);
+      buffers.push(buffer);
       seq += 1;
     }
 
-    return messages;
+    return { buffers, total, uid };
   }
 }

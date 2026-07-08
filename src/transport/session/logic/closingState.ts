@@ -12,7 +12,9 @@ export class ClosingState extends StateMachineLogicEntryBase<
 
   onEnter = async () => {
     // todo send a couple of them
-    const [msg] = MessageBuffer.construct({ type: MessageType.FIN });
+    const {
+      buffers: [msg],
+    } = MessageBuffer.construct({ type: MessageType.FIN });
     this.session.transceiverIPv4.__send(
       this.session.address,
       this.session.port,

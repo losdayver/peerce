@@ -7,6 +7,7 @@ import { Session } from "@src/transport/session/session";
 import {
   DataAckMessage,
   DataMessage,
+  MessageBuffer,
   MessageType,
 } from "@src/transport/messageBuffer";
 
@@ -19,6 +20,8 @@ export class ConnectedState extends StateMachineLogicEntryBase<
 
   private keepAliveNumSeconds = 10;
   private keepAliveInterval: NodeJS.Timeout | undefined;
+
+  private readonly buffersToSendCache = new Map<DataMessage["uid"], Buffer[]>();
 
   private readonly messageCollector: Record<
     DataMessage["uid"],
@@ -39,10 +42,20 @@ export class ConnectedState extends StateMachineLogicEntryBase<
       this.dataAckCollector.get(message.uid) ??
       this.dataAckCollector.set(message.uid, new Set()).get(message.uid);
 
+    // console.log(
+    //   "message.uid in buffersToSendCache",
+    //   !!this.buffersToSendCache.get(message.uid)
+    // );
+    console.log(message.uid);
+
     const hasAckChecker = () => {
-      for (let i = 1; i <= message.total; i++) {
+      for (let i = 0; i < message.total; i++) {
         const hasAck = set!.has(i);
-        if (!hasAck) console.log("todo resend", message.ack);
+        if (!hasAck) {
+          const { transceiverIPv4, address, port } = this.session;
+          const buffers = this.buffersToSendCache.get(message.uid)!;
+          if (buffers) transceiverIPv4.__send(address, port, buffers[i]); // todo fix
+        }
       }
     };
 
@@ -105,23 +118,31 @@ export class ConnectedState extends StateMachineLogicEntryBase<
     }, this.keepAliveNumSeconds * 1000);
   };
 
-  logicHandler: SessionSMTypes["LogicHandler"] = ({
-    action,
-    payload: message,
-  }) => {
+  logicHandler: SessionSMTypes["LogicHandler"] = ({ action, payload }) => {
     if (action == SessionLogicHandlerAction.MESSAGE) {
-      switch (message.type) {
+      switch (payload.type) {
         case MessageType.DATA:
           // todo check all fields are satisfied for message to be DataMessage
-          this.collectDataMessagePart(message as DataMessage);
+          this.collectDataMessagePart(payload as DataMessage);
           break;
         case MessageType.DATA_ACK: {
-          this.collectAck(message as DataAckMessage);
+          this.collectAck(payload as DataAckMessage);
           break;
         }
         case MessageType.FIN:
           this.session.close();
       }
+    } else if (action == SessionLogicHandlerAction.SEND_DATA) {
+      const { transceiverIPv4, address, port } = this.session;
+      const constructed = MessageBuffer.construct({
+        type: MessageType.DATA,
+        payload: typeof payload == "string" ? Buffer.from(payload) : payload,
+      });
+
+      this.buffersToSendCache.set(constructed.uid, constructed.buffers);
+
+      for (const buffer of constructed.buffers)
+        transceiverIPv4.__send(address, port, buffer);
     }
   };
 
