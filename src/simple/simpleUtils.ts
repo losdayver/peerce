@@ -4,7 +4,7 @@ import { PeerToPeerMessage } from "@src/simple/simpleProtocol";
 export const chunkPeerToPeerMessages = ({
   payload,
   fileName,
-  chunkLength = 200,
+  chunkLength = 8196,
 }: {
   payload: Buffer | string;
   fileName?: string;

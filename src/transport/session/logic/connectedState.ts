@@ -5,8 +5,8 @@ import {
 } from "@src/transport/session/sessionMeta";
 import { Session } from "@src/transport/session/session";
 import {
+  DataAckMessage,
   DataMessage,
-  Message,
   MessageType,
 } from "@src/transport/messageBuffer";
 
@@ -17,7 +17,6 @@ export class ConnectedState extends StateMachineLogicEntryBase<
     super();
   }
 
-  private sentMap = new Map<string, { length: number; messages: Message[] }>();
   private keepAliveNumSeconds = 10;
   private keepAliveInterval: NodeJS.Timeout | undefined;
 
@@ -29,15 +28,42 @@ export class ConnectedState extends StateMachineLogicEntryBase<
     }
   > = {};
 
-  private sendAck(message: DataMessage) {
+  private readonly dataAckCollector = new Map<
+    DataMessage["uid"],
+    Set<DataMessage["seq"]>
+  >();
+  private dataAckTimers = new Map<DataMessage["uid"], NodeJS.Timeout>();
+
+  collectAck = (message: DataAckMessage) => {
+    const set =
+      this.dataAckCollector.get(message.uid) ??
+      this.dataAckCollector.set(message.uid, new Set()).get(message.uid);
+
+    const hasAckChecker = () => {
+      for (let i = 1; i <= message.total; i++) {
+        const hasAck = set!.has(i);
+        if (!hasAck) console.log("todo resend", message.ack);
+      }
+    };
+
+    set?.add(message.ack);
+    const timeout = this.dataAckTimers.get(message.uid);
+    if (timeout) clearTimeout(timeout);
+
+    if (set!.size != message.total)
+      this.dataAckTimers.set(message.uid, setTimeout(hasAckChecker, 10));
+  };
+
+  private sendAck = (message: DataMessage) => {
     this.session.sendOne({
       type: MessageType.DATA_ACK,
       uid: message.uid,
       ack: message.seq,
-    });
-  }
+      total: message.total,
+    } satisfies DataAckMessage);
+  };
 
-  private collectDataMessagePart(message: DataMessage) {
+  private collectDataMessagePart = (message: DataMessage) => {
     let msgTuple = this.messageCollector[message.uid];
     if (!msgTuple)
       msgTuple = this.messageCollector[message.uid] = {
@@ -55,6 +81,7 @@ export class ConnectedState extends StateMachineLogicEntryBase<
         ({ payload }) => payload
       );
       const fullMsgString = Buffer.concat(buffers);
+      delete this.messageCollector[message.uid];
       this.session.transceiverIPv4.eventEmitter.emit(
         "onReceive",
         {
@@ -64,7 +91,7 @@ export class ConnectedState extends StateMachineLogicEntryBase<
         fullMsgString
       );
     }
-  }
+  };
 
   onEnter = () => {
     this.session.transceiverIPv4.eventEmitter.emit(
@@ -78,15 +105,18 @@ export class ConnectedState extends StateMachineLogicEntryBase<
     }, this.keepAliveNumSeconds * 1000);
   };
 
-  logicHandler: SessionSMTypes["LogicHandler"] = ({ action, payload }) => {
+  logicHandler: SessionSMTypes["LogicHandler"] = ({
+    action,
+    payload: message,
+  }) => {
     if (action == SessionLogicHandlerAction.MESSAGE) {
-      switch (payload.type) {
+      switch (message.type) {
         case MessageType.DATA:
           // todo check all fields are satisfied for message to be DataMessage
-          this.collectDataMessagePart(payload as DataMessage);
+          this.collectDataMessagePart(message as DataMessage);
           break;
         case MessageType.DATA_ACK: {
-          this.sentMap;
+          this.collectAck(message as DataAckMessage);
           break;
         }
         case MessageType.FIN:

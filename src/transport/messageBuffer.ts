@@ -30,7 +30,7 @@ export interface Message {
 }
 
 export interface DataMessage extends Message {
-  type: MessageType;
+  type: MessageType.DATA;
   uid: number;
   seq: number;
   total: number;
@@ -39,8 +39,15 @@ export interface DataMessage extends Message {
   payload: Buffer;
 }
 
+export type DataAckMessage = Omit<Message, "seq" | "checksum" | "payload"> & {
+  type: MessageType.DATA_ACK;
+  uid: number;
+  ack: number;
+  total: number;
+};
+
 export class MessageBuffer {
-  static maxPayloadSize = 400;
+  static maxPayloadSize = 800;
 
   static decode(buffer: Buffer): Message | null {
     const payloadSize = buffer.length - HEADER_SIZE;
