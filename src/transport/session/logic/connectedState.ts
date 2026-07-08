@@ -10,6 +10,7 @@ import {
   MessageBuffer,
   MessageType,
 } from "@src/transport/messageBuffer";
+import { logWarning } from "@src/utils/logUtils";
 
 export class ConnectedState extends StateMachineLogicEntryBase<
   SessionSMTypes["Config"]
@@ -48,7 +49,10 @@ export class ConnectedState extends StateMachineLogicEntryBase<
         if (!hasAck) {
           const { transceiverIPv4, address, port } = this.session;
           const buffers = this.buffersToSendCache.get(message.uid)!;
-          if (buffers) transceiverIPv4.__send(address, port, buffers[i]); // todo fix
+          if (buffers) {
+            logWarning(`resending lost ${message.uid} seq: ${message.ack}`);
+            transceiverIPv4.__send(address, port, buffers[i]);
+          }
         }
       }
     };

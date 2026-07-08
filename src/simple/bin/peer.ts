@@ -16,6 +16,7 @@ void (async () => {
   const simplePeer = new SimplePeer(envConfig as Required<FullConfig>);
   simplePeer.eventEmitter.on("onFullMessage", ({ buffer, fileName }) => {
     writeFileSync(join(envConfig.outDir ?? "", fileName), buffer);
+    console.log();
     logInfo(`saved to "${join(envConfig.outDir ?? "", fileName)}"`);
   });
   await simplePeer.requestSessionViaRelay();

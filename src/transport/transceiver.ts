@@ -73,6 +73,7 @@ export class TransceiverIPv4 {
     const key = `${address}:${port}`;
 
     const msg = MessageBuffer.decode(buffer);
+    if (!msg) return;
     let session = this.sessionMap.get(key);
 
     // Prevent FIN message from creating new session

@@ -1,3 +1,5 @@
+import { stdout } from "node:process";
+
 export const enum AnsiColor {
   BLACK = 30,
   RED = 31,
@@ -33,3 +35,16 @@ export const logInfo = (message: unknown) =>
 export const logWarning = (message: unknown) =>
   colorLog(message, AnsiColor.YELLOW);
 export const logError = (message: unknown) => colorLog(message, AnsiColor.RED);
+
+export function logProgress(
+  prefix: string,
+  percent: number,
+  prefixColor?: AnsiColor
+) {
+  const barSize = 20;
+  const numBlocks = Math.floor(percent * barSize);
+  const numEmpty = 20 - numBlocks;
+  stdout.write(
+    `\x1b[1F\r\x1b[2K${prefixColor ? ansi(prefix, prefixColor!) : prefix} [${"█".repeat(numBlocks)}${"░".repeat(numEmpty)}] ${Math.floor(percent * 100)}%`
+  );
+}

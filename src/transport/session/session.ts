@@ -54,7 +54,7 @@ export class Session {
     });
   }
 
-  handleMessage(message?: Message | null) {
+  handleMessage(message: Message) {
     if (!message) return;
     this.stateMachine.fireLogicHandler({
       action: SessionLogicHandlerAction.MESSAGE,

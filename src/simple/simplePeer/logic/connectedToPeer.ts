@@ -6,7 +6,7 @@ import {
   PeerToPeerMessageDescriptor,
   PeerToPeerSessionRequest,
 } from "@src/simple/simpleProtocol";
-import { logInfo } from "@src/utils/logUtils";
+import { AnsiColor, logInfo, logProgress } from "@src/utils/logUtils";
 import { chunkPeerToPeerMessages } from "@src/simple/simpleUtils";
 import { sleep } from "@src/utils/promiseUtils";
 
@@ -38,8 +38,12 @@ export class ConnectedToPeer extends StateMachineLogicEntryBase<SimplePeerStateM
       this.chunkCollector.get(chunk.fileName)!);
 
     inner.set(chunk.chunkNo, chunk.payload);
-    logInfo(
-      `receiving "${chunk.fileName}" ${Math.ceil((inner.size / chunk.totalNo) * 100)}%`
+
+    console.log();
+    logProgress(
+      `receiving "${chunk.fileName}"`,
+      inner.size / chunk.totalNo,
+      AnsiColor.BRIGHTMAGENTA
     );
 
     if (inner.size !== chunk.totalNo) return;
