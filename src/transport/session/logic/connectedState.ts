@@ -15,14 +15,13 @@ import { logWarning } from "@src/utils/logUtils";
 export class ConnectedState extends StateMachineLogicEntryBase<
   SessionSMTypes["Config"]
 > {
-  constructor(private session: Session) {
+  constructor(public session: Session) {
     super();
   }
 
+  private dataSender = new DataSender(this);
   private keepAliveNumSeconds = 10;
   private keepAliveInterval: NodeJS.Timeout | undefined;
-
-  private readonly buffersToSendCache = new Map<DataMessage["uid"], Buffer[]>();
 
   private readonly messageCollector: Record<
     DataMessage["uid"],
@@ -31,40 +30,6 @@ export class ConnectedState extends StateMachineLogicEntryBase<
       data: Record<DataMessage["seq"], DataMessage>;
     }
   > = {};
-
-  private readonly dataAckCollector = new Map<
-    DataMessage["uid"],
-    Set<DataMessage["seq"]>
-  >();
-  private dataAckTimers = new Map<DataMessage["uid"], NodeJS.Timeout>();
-
-  collectAck = (message: DataAckMessage) => {
-    const set =
-      this.dataAckCollector.get(message.uid) ??
-      this.dataAckCollector.set(message.uid, new Set()).get(message.uid);
-
-    // todo run this independently. receiving ack should only reset timeout for next check
-    const hasAckChecker = () => {
-      for (let i = 0; i < message.total; i++) {
-        const hasAck = set!.has(i);
-        if (!hasAck) {
-          const { transceiverIPv4, address, port } = this.session;
-          const buffers = this.buffersToSendCache.get(message.uid)!;
-          if (buffers) {
-            logWarning(`resending lost ${message.uid} seq: ${message.ack}`);
-            transceiverIPv4.__send(address, port, buffers[i]);
-          }
-        }
-      }
-    };
-
-    set?.add(message.ack);
-    const timeout = this.dataAckTimers.get(message.uid);
-    if (timeout) clearTimeout(timeout);
-
-    if (set!.size != message.total)
-      this.dataAckTimers.set(message.uid, setTimeout(hasAckChecker, 10));
-  };
 
   private sendAck = (message: DataMessage) => {
     this.session.sendOne({
@@ -126,27 +91,74 @@ export class ConnectedState extends StateMachineLogicEntryBase<
           this.collectDataMessagePart(payload as DataMessage);
           break;
         case MessageType.DATA_ACK: {
-          this.collectAck(payload as DataAckMessage);
+          this.dataSender.collectAck(payload as DataAckMessage);
           break;
         }
         case MessageType.FIN:
           this.session.close();
       }
     } else if (action == SessionLogicHandlerAction.SEND_DATA) {
-      const { transceiverIPv4, address, port } = this.session;
-      const constructed = MessageBuffer.construct({
-        type: MessageType.DATA,
-        payload: typeof payload == "string" ? Buffer.from(payload) : payload,
-      });
-
-      this.buffersToSendCache.set(constructed.uid, constructed.buffers);
-
-      for (const buffer of constructed.buffers)
-        transceiverIPv4.__send(address, port, buffer);
+      this.dataSender.registerNewTransmission(payload);
     }
   };
 
   onExit = () => {
     clearInterval(this.keepAliveInterval);
+  };
+}
+
+class DataSender {
+  constructor(private connectedState: ConnectedState) {}
+
+  private readonly buffersToSendCache = new Map<DataMessage["uid"], Buffer[]>();
+  private readonly dataAckCollector = new Map<
+    DataMessage["uid"],
+    Set<DataMessage["seq"]>
+  >();
+  private dataAckTimers = new Map<DataMessage["uid"], NodeJS.Timeout>();
+
+  registerNewTransmission = (data: string | Buffer) => {
+    const { session } = this.connectedState;
+    const { transceiverIPv4, address, port } = session;
+
+    const constructed = MessageBuffer.construct({
+      type: MessageType.DATA,
+      payload: typeof data == "string" ? Buffer.from(data) : data,
+    });
+
+    this.buffersToSendCache.set(constructed.uid, constructed.buffers);
+
+    for (const buffer of constructed.buffers)
+      transceiverIPv4.__send(address, port, buffer);
+  };
+
+  collectAck = (message: DataAckMessage) => {
+    const { session } = this.connectedState;
+
+    const set =
+      this.dataAckCollector.get(message.uid) ??
+      this.dataAckCollector.set(message.uid, new Set()).get(message.uid);
+
+    // todo run this independently. receiving ack should only reset timeout for next check
+    const hasAckChecker = () => {
+      for (let i = 0; i < message.total; i++) {
+        const hasAck = set!.has(i);
+        if (!hasAck) {
+          const { transceiverIPv4, address, port } = session;
+          const buffers = this.buffersToSendCache.get(message.uid)!;
+          if (buffers) {
+            logWarning(`resending lost ${message.uid} seq: ${message.ack}`);
+            transceiverIPv4.__send(address, port, buffers[i]);
+          }
+        }
+      }
+    };
+
+    set?.add(message.ack);
+    const timeout = this.dataAckTimers.get(message.uid);
+    if (timeout) clearTimeout(timeout);
+
+    if (set!.size != message.total)
+      this.dataAckTimers.set(message.uid, setTimeout(hasAckChecker, 10));
   };
 }
