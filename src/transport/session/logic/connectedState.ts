@@ -91,12 +91,12 @@ export class ConnectedState extends StateMachineLogicEntryBase<
     if (Object.keys(msgTuple.data).length == message.total) {
       msgTuple.isCollected = true;
 
-      writeFileSync(
-        "misc/test/msg.json",
-        Object.values(msgTuple.data)
-          .map((message) => `${JSON.stringify(message, null, 2)}`)
-          .join("\n")
-      );
+      // writeFileSync(
+      //   "misc/test/msg.json",
+      //   Object.values(msgTuple.data)
+      //     .map((message) => `${JSON.stringify(message, null, 2)}`)
+      //     .join("\n")
+      // );
 
       const buffers = Object.values(msgTuple.data).map(
         ({ payload }) => payload
@@ -147,15 +147,15 @@ export class ConnectedState extends StateMachineLogicEntryBase<
         payload: typeof payload == "string" ? Buffer.from(payload) : payload,
       });
 
-      writeFileSync(
-        "misc/test/msg.json",
-        Object.values(constructed.buffers)
-          .map(
-            (message) =>
-              `${JSON.stringify(MessageBuffer.decode(message), null, 2)}`
-          )
-          .join("\n")
-      );
+      // writeFileSync(
+      //   "misc/test/msg.json",
+      //   Object.values(constructed.buffers)
+      //     .map(
+      //       (message) =>
+      //         `${JSON.stringify(MessageBuffer.decode(message), null, 2)}`
+      //     )
+      //     .join("\n")
+      // );
 
       this.buffersToSendCache.set(constructed.uid, constructed.buffers);
 
