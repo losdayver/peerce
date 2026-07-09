@@ -11,6 +11,7 @@ import {
   MessageType,
 } from "@src/transport/messageBuffer";
 import { logWarning } from "@src/utils/logUtils";
+import { writeFileSync } from "node:fs";
 
 export class ConnectedState extends StateMachineLogicEntryBase<
   SessionSMTypes["Config"]
@@ -89,6 +90,14 @@ export class ConnectedState extends StateMachineLogicEntryBase<
 
     if (Object.keys(msgTuple.data).length == message.total) {
       msgTuple.isCollected = true;
+
+      writeFileSync(
+        "misc/test/msg.json",
+        Object.values(msgTuple.data)
+          .map((message) => `${JSON.stringify(message, null, 2)}`)
+          .join("\n")
+      );
+
       const buffers = Object.values(msgTuple.data).map(
         ({ payload }) => payload
       );
@@ -137,6 +146,16 @@ export class ConnectedState extends StateMachineLogicEntryBase<
         type: MessageType.DATA,
         payload: typeof payload == "string" ? Buffer.from(payload) : payload,
       });
+
+      writeFileSync(
+        "misc/test/msg.json",
+        Object.values(constructed.buffers)
+          .map(
+            (message) =>
+              `${JSON.stringify(MessageBuffer.decode(message), null, 2)}`
+          )
+          .join("\n")
+      );
 
       this.buffersToSendCache.set(constructed.uid, constructed.buffers);
 
