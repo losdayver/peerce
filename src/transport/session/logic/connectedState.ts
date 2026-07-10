@@ -10,7 +10,7 @@ import {
   MessageBuffer,
   MessageType,
 } from "@src/transport/messageBuffer";
-import { logWarning } from "@src/utils/logUtils";
+import { sleep } from "@src/utils/promiseUtils";
 
 export class ConnectedState extends StateMachineLogicEntryBase<
   SessionSMTypes["Config"]
@@ -91,7 +91,7 @@ export class ConnectedState extends StateMachineLogicEntryBase<
           this.collectDataMessagePart(payload as DataMessage);
           break;
         case MessageType.DATA_ACK: {
-          this.dataSender.collectAck(payload as DataAckMessage);
+          this.dataSender.collectDataAck(payload as DataAckMessage);
           break;
         }
         case MessageType.FIN:
@@ -110,55 +110,96 @@ export class ConnectedState extends StateMachineLogicEntryBase<
 class DataSender {
   constructor(private connectedState: ConnectedState) {}
 
-  private readonly buffersToSendCache = new Map<DataMessage["uid"], Buffer[]>();
-  private readonly dataAckCollector = new Map<
-    DataMessage["uid"],
-    Set<DataMessage["seq"]>
-  >();
-  private dataAckTimers = new Map<DataMessage["uid"], NodeJS.Timeout>();
+  private transmissionMap = new Map<DataMessage["uid"], Transmission>();
+
+  collectDataAck = (message: DataAckMessage) => {
+    const transmission = this.transmissionMap.get(message.uid);
+    transmission?.collectDataAck(message);
+  };
 
   registerNewTransmission = (data: string | Buffer) => {
-    const { session } = this.connectedState;
-    const { transceiverIPv4, address, port } = session;
+    const transmission = new Transmission(this.connectedState, this);
+    const uid = transmission.register(data);
+    this.transmissionMap.set(uid, transmission);
+    transmission.transmit();
+  };
 
+  unregisterTransmission = (uid: DataMessage["uid"]) => {
+    this.transmissionMap.delete(uid);
+  };
+}
+
+class Transmission {
+  constructor(
+    private connectedState: ConnectedState,
+    private dataSender: DataSender
+  ) {}
+
+  private constructed: ReturnType<typeof MessageBuffer.construct> | undefined;
+  private dataAckMap = new Map<DataAckMessage["ack"], DataAckMessage>();
+  private greatestSequentialAckNum = -1;
+  private resendTimer: NodeJS.Timeout | undefined;
+
+  resetResendTimer = () => {
+    if (this.resendTimer) clearTimeout(this.resendTimer);
+    this.resendTimer = setTimeout(this.resend, 100);
+  };
+
+  private isTransmissionFin = false;
+
+  isResending = false;
+  resend = async () => {
+    if (this.isResending) return;
+    this.isResending = true;
+
+    const {
+      session: { transceiverIPv4, address, port },
+    } = this.connectedState;
+
+    for (
+      let i = this.greatestSequentialAckNum + 1;
+      i < this.constructed!.buffers.length;
+      i++
+    ) {
+      const hasAck = this.dataAckMap.get(i);
+
+      if (!hasAck) {
+        transceiverIPv4.__send(address, port, this.constructed!.buffers[i]);
+      }
+      await sleep(1);
+    }
+    this.isResending = false;
+    if (!this.isTransmissionFin) this.resetResendTimer();
+  };
+
+  register = (data: string | Buffer) => {
     const constructed = MessageBuffer.construct({
       type: MessageType.DATA,
       payload: typeof data == "string" ? Buffer.from(data) : data,
     });
-
-    this.buffersToSendCache.set(constructed.uid, constructed.buffers);
-
-    for (const buffer of constructed.buffers)
-      transceiverIPv4.__send(address, port, buffer);
+    this.constructed = constructed;
+    return constructed.uid;
   };
 
-  collectAck = (message: DataAckMessage) => {
+  transmit = () => {
     const { session } = this.connectedState;
+    const { transceiverIPv4, address, port } = session;
+    for (const buffer of this.constructed!.buffers)
+      transceiverIPv4.__send(address, port, buffer);
+    this.resetResendTimer();
+  };
 
-    const set =
-      this.dataAckCollector.get(message.uid) ??
-      this.dataAckCollector.set(message.uid, new Set()).get(message.uid);
+  collectDataAck = (message: DataAckMessage) => {
+    this.dataAckMap.set(message.ack, message);
+    if (message.ack == this.greatestSequentialAckNum + 1)
+      this.greatestSequentialAckNum = message.ack;
 
-    // todo run this independently. receiving ack should only reset timeout for next check
-    const hasAckChecker = () => {
-      for (let i = 0; i < message.total; i++) {
-        const hasAck = set!.has(i);
-        if (!hasAck) {
-          const { transceiverIPv4, address, port } = session;
-          const buffers = this.buffersToSendCache.get(message.uid)!;
-          if (buffers) {
-            logWarning(`resending lost ${message.uid} seq: ${message.ack}`);
-            transceiverIPv4.__send(address, port, buffers[i]);
-          }
-        }
+    if (this.greatestSequentialAckNum + 1 == this.constructed?.buffers.length) {
+      if (this.resendTimer) {
+        this.isTransmissionFin = true;
+        clearTimeout(this.resendTimer);
+        this.dataSender.unregisterTransmission(this.constructed.uid);
       }
-    };
-
-    set?.add(message.ack);
-    const timeout = this.dataAckTimers.get(message.uid);
-    if (timeout) clearTimeout(timeout);
-
-    if (set!.size != message.total)
-      this.dataAckTimers.set(message.uid, setTimeout(hasAckChecker, 10));
+    } else this.resetResendTimer();
   };
 }
