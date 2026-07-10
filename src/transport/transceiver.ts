@@ -98,6 +98,7 @@ export class TransceiverIPv4 {
       closing: {
         onEnter: () => {
           this.socket?.removeAllListeners();
+          this.sessionMap.values().forEach((session) => session.close());
           this.socket?.close();
           void this.stateMachine.doStateTransition("closed");
         },

@@ -46,6 +46,7 @@ export class SimplePeer {
     connectingToRelay: new ConnectingToRelay(this),
     connectingToPeer: new ConnectingToPeer(this),
     connectedToPeer: new ConnectedToPeer(this),
+    closing: new ConnectedToPeer(this),
   };
 
   requestSessionViaRelay = async () => {
@@ -66,5 +67,7 @@ export class SimplePeer {
     });
   };
 
-  // todo send method
+  close = () => {
+    void this.stateMachine.doStateTransition("closing");
+  };
 }

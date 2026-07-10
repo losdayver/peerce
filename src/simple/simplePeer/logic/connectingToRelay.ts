@@ -36,6 +36,4 @@ export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStat
 
     await stateMachine.doStateTransition("connectingToPeer");
   };
-  logicHandler = () => {};
-  onExit = () => {};
 }

@@ -18,6 +18,7 @@ void (async () => {
     writeFileSync(join(envConfig.outDir ?? "", fileName), buffer);
     console.log();
     logInfo(`saved to "${join(envConfig.outDir ?? "", fileName)}"`);
+    simplePeer.close();
   });
   await simplePeer.requestSessionViaRelay();
   if (envConfig.payload)
