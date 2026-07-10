@@ -42,12 +42,11 @@ export class SimpleRelay {
 
     const peerRequest = this.requestMap.get(`${obj.distantTag}:${obj.selfTag}`);
 
-    colorLog(
-      `request satisfied ${obj.selfTag}:${obj.distantTag}`,
-      AnsiColor.BRIGHTGREEN
-    );
-
     if (peerRequest) {
+      colorLog(
+        `request satisfied ${obj.selfTag}:${obj.distantTag}`,
+        AnsiColor.BRIGHTGREEN
+      );
       this.transceiver.send(
         peerRequest.address,
         peerRequest.port,
