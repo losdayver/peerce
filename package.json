@@ -1,7 +1,7 @@
 {
-  "name": "p2p_messenger",
-  "version": "1.0.2",
-  "description": "",
+  "name": "peerce",
+  "version": "1.0.3",
+  "description": "Simple udp file transfer module based on NAT hole punching",
   "scripts": {
     "complete-build": "npm i && npx tsc && npm pack"
   },
@@ -9,8 +9,8 @@
   "author": "",
   "license": "MIT",
   "bin": {
-    "p2p-s-client": "./dist/simple/bin/peer.js",
-    "p2p-s-relay": "./dist/simple/bin/relay.js"
+    "peerce": "./dist/simple/bin/peer.js",
+    "peerce-relay": "./dist/simple/bin/relay.js"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
