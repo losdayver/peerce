@@ -1,10 +1,8 @@
 import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
 import { SimplePeerStateMachineConfig } from "@src/simple/simplePeer/stateMeta";
 import { SimplePeer } from "@src/simple/simplePeer/simplePeer";
-import { getResolver } from "@src/utils/promiseUtils";
-import { AnsiColor, logInfo } from "@src/utils/logUtils";
 
-export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStateMachineConfig> {
+export class Closing extends StateMachineLogicEntryBase<SimplePeerStateMachineConfig> {
   simplePeer: SimplePeer;
 
   constructor(simplePeer: SimplePeer) {
@@ -13,9 +11,7 @@ export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStat
   }
 
   onEnter = async () => {
-    const {transceiver} = this.simplePeer;
+    const { transceiver } = this.simplePeer;
     transceiver.close();
   };
-  logicHandler = () => {};
-  onExit = () => {};
 }

@@ -20,6 +20,7 @@ import {
   ConnectedToPeerLogicHandler,
 } from "./logic/connectedToPeer";
 import { EventEmitter } from "node:stream";
+import { Closing } from "./logic/closing";
 
 interface SimplePeerEventEmitterMap {
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
@@ -46,7 +47,7 @@ export class SimplePeer {
     connectingToRelay: new ConnectingToRelay(this),
     connectingToPeer: new ConnectingToPeer(this),
     connectedToPeer: new ConnectedToPeer(this),
-    closing: new ConnectedToPeer(this),
+    closing: new Closing(this),
   };
 
   requestSessionViaRelay = async () => {
