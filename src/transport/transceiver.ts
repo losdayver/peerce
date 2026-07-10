@@ -105,7 +105,7 @@ export class TransceiverIPv4 {
 
       closed: {
         onEnter: () => {
-          setTimeout((this.socket as any).close, 2000); // todo close all sessions and await for all to close
+          // setTimeout((this.socket as any).close, 2000); // todo close all sessions and await for all to close
         },
       },
 
