@@ -158,7 +158,7 @@ class Transmission {
 
     for (
       let i = this.greatestSequentialAckNum + 1;
-      i < Math.min(i + 20, this.constructed!.total);
+      i < Math.min(this.greatestSequentialAckNum + 20, this.constructed!.total);
       i++
     ) {
       const hasAck = this.dataAckMap.get(i);

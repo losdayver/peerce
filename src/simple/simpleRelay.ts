@@ -3,6 +3,7 @@ import {
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
 } from "./simpleProtocol";
+import { AnsiColor, colorLog, logInfo } from "@src/utils/logUtils";
 
 export class SimpleRelay {
   transceiver: TransceiverIPv4;
@@ -17,25 +18,36 @@ export class SimpleRelay {
     void this.transceiver.listen({ address, port });
 
     this.transceiver.eventEmitter.on("onReceive", this.onReceiveFromPeer);
+    this.transceiver.eventEmitter.on("onSessionClosed", this.onSessionClosed);
   }
+
+  onSessionClosed = (address: string, port: number) => {
+    for (const [key, peer] of this.requestMap.entries()) {
+      if (peer.address === address && peer.port === port) {
+        this.requestMap.delete(key);
+      }
+    }
+  };
 
   onReceiveFromPeer = (
     addrObj: { address: string; port: number },
     msg: Buffer
   ) => {
-    // todo zod or something
-    console.log("asdasadad");
-
     const obj = JSON.parse(msg.toString()) as PeerToRelaySessionRequest;
-    console.log("adding new record to target map", addrObj, msg);
 
+    // todo zod or something
     this.requestMap.set(`${obj.selfTag}:${obj.distantTag}`, { ...addrObj });
+
+    logInfo(`requesting ${obj.selfTag}:${obj.distantTag}`);
 
     const peerRequest = this.requestMap.get(`${obj.distantTag}:${obj.selfTag}`);
 
+    colorLog(
+      `request satisfied ${obj.selfTag}:${obj.distantTag}`,
+      AnsiColor.BRIGHTGREEN
+    );
+
     if (peerRequest) {
-      // todo
-      console.log("doing relay logic");
       this.transceiver.send(
         peerRequest.address,
         peerRequest.port,
@@ -56,6 +68,4 @@ export class SimpleRelay {
       );
     }
   };
-
-  doAddressExchange = () => {};
 }
