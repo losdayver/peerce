@@ -1,4 +1,5 @@
 import { chunkBuffer, crc32 } from "@src/utils/bufferUtils";
+import { logWarning } from "@src/utils/logUtils";
 import { randomBytes } from "node:crypto";
 
 export const enum MessageType {
@@ -56,7 +57,10 @@ export class MessageBuffer {
     buffer.writeUIntBE(0, HEADER_SIZE - SUM_SIZE, SUM_SIZE);
     const initialChecksum = crc32(buffer);
 
-    if (checksum != initialChecksum) return null;
+    if (checksum != initialChecksum) {
+      logWarning("crc32 failure");
+      return null;
+    }
 
     const message: { [K in keyof Message]: Message[K] | null } = {
       type: null,
