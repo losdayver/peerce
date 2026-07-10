@@ -48,12 +48,12 @@ export class ConnectedToPeer extends StateMachineLogicEntryBase<SimplePeerStateM
 
     if (inner.size !== chunk.totalNo) return;
 
-    const allB64Strings = [
-      ...this.chunkCollector.get(chunk.fileName)!.values(),
-    ];
+    const chunks = this.chunkCollector.get(chunk.fileName)!;
 
     const fullBuffer = Buffer.concat(
-      allB64Strings.map((b64) => Buffer.from(b64, "base64"))
+      [...chunks.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([, payload]) => Buffer.from(payload, "base64"))
     );
 
     this.simplePeer.eventEmitter.emit("onFullMessage", {
