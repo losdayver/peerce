@@ -25,7 +25,7 @@ const transceiverStateTransitionMap = {
   error: [] as const,
 } satisfies AvailableTransitionsMap;
 
-interface TransceiverIPv4Params {
+export interface TransceiverIPv4Params {
   self?: {
     address: string;
     port: number;

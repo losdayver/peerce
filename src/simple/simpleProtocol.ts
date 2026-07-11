@@ -29,6 +29,8 @@ export interface SimpleProtocolPeerConfig {
   relayPort?: number;
   selfTag?: string;
   distantTag?: string;
+  selfAddr?: string;
+  selfPort?: number;
 }
 
 export interface SimpleProtocolPeerExchange {

@@ -3,6 +3,7 @@
   "version": "1.0.3",
   "description": "Simple udp file transfer module based on NAT hole punching",
   "scripts": {
+    "test": "npx tsc && jest",
     "complete-build": "npm i && npx tsc && npm pack"
   },
   "keywords": [],

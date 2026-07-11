@@ -30,17 +30,17 @@ interface SimplePeerEventEmitterMap {
 export class SimplePeer {
   transceiver: TransceiverIPv4;
   stateMachine: SimplePeerStateMachine;
-  initialParams: Required<SimpleProtocolPeerConfig>;
   eventEmitter = new EventEmitter<SimplePeerEventEmitterMap>();
+  initialParams: Required<SimpleProtocolPeerConfig>;
 
-  constructor(initialParams: Required<SimpleProtocolPeerConfig>) {
+  constructor(initialParams: SimpleProtocolPeerConfig) {
     this.transceiver = new TransceiverIPv4();
     this.stateMachine = new StateMachine<SimplePeerStateMachineConfig>(
       "idle",
       simplePeerStateTransitionMap,
       this.simplePeerStateLogic
     );
-    this.initialParams = initialParams;
+    this.initialParams = initialParams as Required<SimpleProtocolPeerConfig>;
   }
 
   simplePeerStateLogic: SimplePeerStateMachineLogic = {

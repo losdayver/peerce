@@ -2,7 +2,8 @@ import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
 import { SimplePeerStateMachineConfig } from "@src/simple/simplePeer/stateMeta";
 import { SimplePeer } from "@src/simple/simplePeer/simplePeer";
 import { getResolver } from "@src/utils/promiseUtils";
-import { AnsiColor, logInfo } from "@src/utils/logUtils";
+import { logInfo } from "@src/utils/logUtils";
+import { TransceiverIPv4Params } from "@src/transport/transceiver";
 
 export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStateMachineConfig> {
   simplePeer: SimplePeer;
@@ -14,11 +15,13 @@ export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStat
 
   onEnter = async () => {
     const { initialParams, transceiver, stateMachine } = this.simplePeer;
-    const { relayAddr, relayPort } = initialParams;
+    const { relayAddr, relayPort, selfAddr, selfPort } = initialParams;
 
     logInfo("firing socket");
 
-    await transceiver.listen();
+    let selfObj: TransceiverIPv4Params["self"] | undefined = undefined;
+    if (selfAddr && selfPort) selfObj = { address: selfAddr, port: selfPort };
+    await transceiver.listen(selfObj);
 
     logInfo(`connecting to relay ${relayAddr}:${relayPort}`);
     transceiver.connect(relayAddr, relayPort);
