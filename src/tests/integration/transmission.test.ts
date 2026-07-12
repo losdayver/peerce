@@ -1,34 +1,22 @@
 import { randomBytes } from "node:crypto";
-import { UDPLossyProxy } from "@src/tests/testUtils";
+import { PeerLossyProxy } from "@src/tests/testUtils";
 import { once } from "@src/utils/promiseUtils";
 import { SimplePeer } from "@src/simple/simplePeer/simplePeer";
 import { SimpleRelay } from "@src/simple/simpleRelay";
 import { register } from "module-alias/register";
 register;
 
-const relayAddr = { address: "127.0.0.1", port: 5656 };
-const peer1Addr = { address: "127.0.0.1", port: 5657 };
-const peer2Addr = { address: "127.0.0.1", port: 5658 };
-const proxy1Addr = { address: "127.0.0.1", port: 5659 };
-const proxy2Addr = { address: "127.0.0.1", port: 5660 };
+const localhost = "127.0.0.1";
+const relayAddr = { address: localhost, port: 5656 };
+const peer1Addr = { address: localhost, port: 5657 };
+const peer2Addr = { address: localhost, port: 5658 };
+const proxy1Addr = { address: localhost, port: 5659 };
+const proxy2Addr = { address: localhost, port: 5660 };
 
 // todo fix proxies
 
-const proxy1 = new UDPLossyProxy(
-  proxy1Addr.address,
-  proxy1Addr.port,
-  peer1Addr,
-  peer2Addr,
-  relayAddr
-);
-
-const proxy2 = new UDPLossyProxy(
-  proxy2Addr.address,
-  proxy2Addr.port,
-  peer2Addr,
-  peer1Addr,
-  relayAddr
-);
+const proxy1 = new PeerLossyProxy(proxy1Addr.address, proxy1Addr.port);
+const proxy2 = new PeerLossyProxy(proxy2Addr.address, proxy2Addr.port);
 
 const peer1 = new SimplePeer({
   selfTag: "peer1",
@@ -37,7 +25,7 @@ const peer1 = new SimplePeer({
   relayPort: relayAddr.port,
   selfAddr: peer1Addr.address,
   selfPort: peer1Addr.port,
-}); 
+});
 
 const peer2 = new SimplePeer({
   selfTag: "peer2",
@@ -48,11 +36,9 @@ const peer2 = new SimplePeer({
   selfPort: peer2Addr.port,
 });
 
-const relay = new SimpleRelay(relayAddr.address, relayAddr.port);
-
-beforeAll(() => {
-  proxy1.start();
-  proxy2.start();
+const relay = new SimpleRelay(relayAddr.address, relayAddr.port, {
+  peer1: proxy1,
+  peer2: proxy2,
 });
 
 test("Connection via relay", async () => {
@@ -60,12 +46,10 @@ test("Connection via relay", async () => {
     peer1.requestSessionViaRelay(),
     peer2.requestSessionViaRelay(),
   ]);
-  proxy1.wasConnectedViaRelay();
-  proxy2.wasConnectedViaRelay();
   expect(promise).toBeTruthy();
 });
 
-test("Data transmission", async () => {
+test("Lossy data transmission", async () => {
   const massivePayload = randomBytes(100000).toString();
 
   const testData = { fileName: "testPayload", payload: massivePayload };
@@ -73,6 +57,7 @@ test("Data transmission", async () => {
     peer2.eventEmitter,
     "onFullMessage"
   );
+  proxy1.lossPercentage = 0.6;
   peer1.sendData(testData);
 
   const data = await dataPromise;
@@ -81,4 +66,6 @@ test("Data transmission", async () => {
     data.buffer.toString() == testData.payload &&
       data.fileName == testData.fileName
   ).toBeTruthy();
-});
+
+  proxy1.lossPercentage = 0;
+}, 10000);

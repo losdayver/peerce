@@ -39,7 +39,6 @@ export class ConnectedToPeer extends StateMachineLogicEntryBase<SimplePeerStateM
 
     inner.set(chunk.chunkNo, chunk.payload);
 
-    console.log();
     logProgress(
       `receiving "${chunk.fileName}"`,
       inner.size / chunk.totalNo,

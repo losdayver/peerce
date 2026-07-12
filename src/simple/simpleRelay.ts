@@ -5,6 +5,20 @@ import {
 } from "./simpleProtocol";
 import { AnsiColor, colorLog, logInfo } from "@src/utils/logUtils";
 
+export abstract class PeerProxy {
+  constructor(
+    public readonly address: string,
+    public readonly port: number
+  ) {}
+
+  abstract setup: (
+    ownPeer: { address: string; port: number },
+    distantPeer: { address: string; port: number }
+  ) => void | Promise<void>;
+}
+
+type TagProxyMap = Record<string, PeerProxy>;
+
 export class SimpleRelay {
   transceiver: TransceiverIPv4;
 
@@ -13,7 +27,11 @@ export class SimpleRelay {
     { address: string; port: number }
   >();
 
-  constructor(address: string, port: number) {
+  constructor(
+    address: string,
+    port: number,
+    private tagProxyMap?: TagProxyMap
+  ) {
     this.transceiver = new TransceiverIPv4();
     void this.transceiver.listen({ address, port });
 
@@ -29,7 +47,7 @@ export class SimpleRelay {
     }
   };
 
-  onReceiveFromPeer = (
+  onReceiveFromPeer = async (
     addrObj: { address: string; port: number },
     msg: Buffer
   ) => {
@@ -43,6 +61,28 @@ export class SimpleRelay {
     const peerRequest = this.requestMap.get(`${obj.distantTag}:${obj.selfTag}`);
 
     if (peerRequest) {
+      let proxy1: PeerProxy | undefined;
+      let proxy2: PeerProxy | undefined;
+      if (this.tagProxyMap) proxy1 = this.tagProxyMap[obj.selfTag];
+      if (this.tagProxyMap) proxy2 = this.tagProxyMap[obj.distantTag];
+
+      if (proxy1)
+        await proxy1.setup(
+          { address: addrObj.address, port: addrObj.port },
+          {
+            address: proxy2 ? proxy2.address : peerRequest.address,
+            port: proxy2 ? proxy2.port : peerRequest.port,
+          }
+        );
+      if (proxy2)
+        await proxy2.setup(
+          { address: peerRequest.address, port: peerRequest.port },
+          {
+            address: proxy1 ? proxy1.address : addrObj.address,
+            port: proxy1 ? proxy1.port : addrObj.port,
+          }
+        );
+
       colorLog(
         `request satisfied ${obj.selfTag}:${obj.distantTag}`,
         AnsiColor.BRIGHTGREEN
@@ -52,8 +92,8 @@ export class SimpleRelay {
         peerRequest.port,
         JSON.stringify({
           distantTag: obj.selfTag,
-          distantAddress: addrObj.address,
-          distantPort: addrObj.port,
+          distantAddress: proxy2 ? proxy2.address : addrObj.address,
+          distantPort: proxy2 ? proxy2.port : addrObj.port,
         } satisfies PeerToPeerSessionRequest)
       );
       this.transceiver.send(
@@ -61,8 +101,8 @@ export class SimpleRelay {
         addrObj.port,
         JSON.stringify({
           distantTag: obj.distantTag,
-          distantAddress: peerRequest.address,
-          distantPort: peerRequest.port,
+          distantAddress: proxy1 ? proxy1.address : peerRequest.address,
+          distantPort: proxy1 ? proxy1.port : peerRequest.port,
         } satisfies PeerToPeerSessionRequest)
       );
     }

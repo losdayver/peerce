@@ -45,6 +45,6 @@ export function logProgress(
   const numBlocks = Math.floor(percent * barSize);
   const numEmpty = 20 - numBlocks;
   stdout.write(
-    `\x1b[1F\r\x1b[2K${prefixColor ? ansi(prefix, prefixColor!) : prefix} [${"█".repeat(numBlocks)}${"░".repeat(numEmpty)}] ${Math.floor(percent * 100)}%`
+    `\x1b[1F\r\x1b[2K${prefixColor ? ansi(prefix, prefixColor!) : prefix} [${"█".repeat(numBlocks)}${"░".repeat(numEmpty)}] ${Math.floor(percent * 100)}%\n`
   );
 }
