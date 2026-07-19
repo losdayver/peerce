@@ -1,12 +1,8 @@
 import { StateMachine } from "../../utils/stateMachine";
-import {
-  Message,
-  MessageBuffer,
-  MessageType,
-} from "../messageBuffer";
+import { Message, MessageBuffer, MessageType } from "../messageBuffer";
 import { TransceiverIPv4 } from "../transceiver";
 import {
-  SessionLogicHandlerAction,
+  SessionStateEventAction,
   SessionSMTypes,
   sessionStateTransitionMap,
 } from "./sessionMeta";
@@ -24,13 +20,13 @@ export class Session {
     this.stateMachine = new StateMachine<SessionSMTypes["Config"]>(
       "idle",
       sessionStateTransitionMap,
-      this.sessionStateLogic
+      this.sessionStateBehaviors
     );
   }
 
   stateMachine: SessionSMTypes["StateMachine"];
 
-  private sessionStateLogic: SessionSMTypes["Logic"] = {
+  private sessionStateBehaviors: SessionSMTypes["Behaviors"] = {
     connecting: new ConnectingState(this),
     connected: new ConnectedState(this),
     closing: new ClosingState(this),
@@ -46,29 +42,29 @@ export class Session {
   }
 
   sendData(raw: string | Buffer) {
-    if (this.stateMachine.currentState != "connected")
+    if (this.stateMachine.getCurrentState() != "connected")
       throw new Error("Cannot send while not connected");
-    this.stateMachine.fireLogicHandler({
-      action: SessionLogicHandlerAction.SEND_DATA,
+    this.stateMachine.dispatchEvent({
+      action: SessionStateEventAction.SEND_DATA,
       payload: raw,
     });
   }
 
   handleMessage(message: Message) {
     if (!message) return;
-    this.stateMachine.fireLogicHandler({
-      action: SessionLogicHandlerAction.MESSAGE,
+    this.stateMachine.dispatchEvent({
+      action: SessionStateEventAction.MESSAGE,
       payload: message,
     });
   }
 
   connect = () => {
-    void this.stateMachine.doStateTransition("connecting");
+    void this.stateMachine.transitionTo("connecting");
     // todo await for connection event
   };
 
   close = () => {
-    void this.stateMachine.doStateTransition("closing");
+    void this.stateMachine.transitionTo("closing");
     // todo await for closed event
   };
 }

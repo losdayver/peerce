@@ -1,9 +1,9 @@
-import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
 import { SessionSMTypes } from "../sessionMeta";
 import { Session } from "../session";
 import { MessageBuffer, MessageType } from "../../messageBuffer";
 
-export class ClosingState extends StateMachineLogicEntryBase<
+export class ClosingState extends StateMachineBehaviorBase<
   SessionSMTypes["Config"]
 > {
   constructor(private session: Session) {
@@ -20,6 +20,6 @@ export class ClosingState extends StateMachineLogicEntryBase<
       this.session.port,
       msg
     );
-    await this.session.stateMachine.doStateTransition("closed");
+    await this.session.stateMachine.transitionTo("closed");
   };
 }

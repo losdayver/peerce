@@ -1,8 +1,5 @@
-import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
-import {
-  SessionLogicHandlerAction,
-  SessionSMTypes,
-} from "../sessionMeta";
+import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
+import { SessionStateEventAction, SessionSMTypes } from "../sessionMeta";
 import { Session } from "../session";
 import {
   DataAckMessage,
@@ -12,7 +9,7 @@ import {
 } from "../../messageBuffer";
 import { sleep } from "../../../utils/promiseUtils";
 
-export class ConnectedState extends StateMachineLogicEntryBase<
+export class ConnectedState extends StateMachineBehaviorBase<
   SessionSMTypes["Config"]
 > {
   constructor(public session: Session) {
@@ -83,8 +80,8 @@ export class ConnectedState extends StateMachineLogicEntryBase<
     }, this.keepAliveNumSeconds * 1000);
   };
 
-  logicHandler: SessionSMTypes["LogicHandler"] = ({ action, payload }) => {
-    if (action == SessionLogicHandlerAction.MESSAGE) {
+  eventHandler: SessionSMTypes["BehaviorEventHandler"] = ({ action, payload }) => {
+    if (action == SessionStateEventAction.MESSAGE) {
       switch (payload.type) {
         case MessageType.DATA:
           // todo check all fields are satisfied for message to be DataMessage
@@ -97,7 +94,7 @@ export class ConnectedState extends StateMachineLogicEntryBase<
         case MessageType.FIN:
           this.session.close();
       }
-    } else if (action == SessionLogicHandlerAction.SEND_DATA) {
+    } else if (action == SessionStateEventAction.SEND_DATA) {
       this.dataSender.registerNewTransmission(payload);
     }
   };

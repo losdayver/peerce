@@ -1,12 +1,9 @@
 import { MessageType } from "../../messageBuffer";
 import { Session } from "../session";
-import {
-  SessionLogicHandlerAction,
-  SessionSMTypes,
-} from "../sessionMeta";
-import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { SessionStateEventAction, SessionSMTypes } from "../sessionMeta";
+import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
 
-export class ConnectingState extends StateMachineLogicEntryBase<
+export class ConnectingState extends StateMachineBehaviorBase<
   SessionSMTypes["Config"]
 > {
   private retriesInterval?: NodeJS.Timeout;
@@ -22,20 +19,19 @@ export class ConnectingState extends StateMachineLogicEntryBase<
     this.retriesInterval = setInterval(() => {
       this.session.sendOne({ type: MessageType.HELLO });
       retries -= 1;
-      if (retries <= 0)
-        void this.session.stateMachine.doStateTransition("closing");
+      if (retries <= 0) void this.session.stateMachine.transitionTo("closing");
     }, this.retriesNumSeconds * 1000);
   };
 
-  logicHandler: SessionSMTypes["LogicHandler"] = ({ action, payload }) => {
-    if (action != SessionLogicHandlerAction.MESSAGE) return;
+  eventHandler: SessionSMTypes["BehaviorEventHandler"] = ({ action, payload }) => {
+    if (action != SessionStateEventAction.MESSAGE) return;
     switch (payload.type) {
       case MessageType.HELLO:
         this.session.sendOne({ type: MessageType.HELLO_ACK });
         return;
       case MessageType.HELLO_ACK:
         this.session.sendOne({ type: MessageType.HELLO_ACK });
-        void this.session.stateMachine.doStateTransition("connected");
+        void this.session.stateMachine.transitionTo("connected");
         return;
     }
   };

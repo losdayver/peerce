@@ -1,8 +1,8 @@
-import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
 import { SessionSMTypes } from "../sessionMeta";
 import { Session } from "../session";
 
-export class ClosedState extends StateMachineLogicEntryBase<
+export class ClosedState extends StateMachineBehaviorBase<
   SessionSMTypes["Config"]
 > {
   constructor(private session: Session) {

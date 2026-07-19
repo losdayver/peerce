@@ -1,85 +1,86 @@
-type StateKeyType = string;
+type StateKey = string | symbol;
 
 /** Declarations */
 
-export type StateMachineConfig<
-  ATM extends AvailableTransitionsMap = AvailableTransitionsMap,
-  HandlerType extends Function = (...args) => void,
-> = {
-  atm: ATM;
-  handler: HandlerType;
-};
-
-export type StateMachineLogicEntry<Config extends StateMachineConfig> = {
+type StateMachineBehavior<Config extends StateMachineConfig> = {
   onEnter?: (
-    from: keyof Config["atm"] | null,
+    from: keyof Config["transitionGraph"] | null,
     params?: any
   ) => void | Promise<void>; // null is for initial state enter
-  onExit?: (to: keyof Config["atm"]) => void | Promise<void>;
-  logicHandler?: Config["handler"];
+  onExit?: (to: keyof Config["transitionGraph"]) => void | Promise<void>;
+  eventHandler?: Config["behaviorEventHandler"];
   [SK: string]: any;
 };
 
-export type AvailableTransitionsMap = Record<StateKeyType, StateKeyType[]>;
-
-export type StateMachineLogic<Config extends StateMachineConfig> = {
-  [K in keyof Config["atm"]]?: StateMachineLogicEntry<Config>;
+type StateMachineBehaviors<Config extends StateMachineConfig> = {
+  [K in keyof Config["transitionGraph"]]?: StateMachineBehavior<Config>;
 };
 
-export abstract class StateMachineLogicEntryBase<
+export type StateMachineConfig<
+  Transitions extends TransitionGraph = TransitionGraph,
+  EventHandler extends Function = (...args) => void,
+> = {
+  transitionGraph: Transitions;
+  behaviorEventHandler: EventHandler;
+};
+
+export type TransitionGraph = Record<StateKey, readonly StateKey[]>;
+
+export abstract class StateMachineBehaviorBase<
   Config extends StateMachineConfig,
-> implements StateMachineLogicEntry<Config> {
-  logicHandler?: Config["handler"];
+> implements StateMachineBehavior<Config> {
+  eventHandler?: Config["behaviorEventHandler"];
   onEnter?: (
-    from: keyof Config["atm"] | null,
+    from: keyof Config["transitionGraph"] | null,
     params?: any
   ) => void | Promise<void>;
-  onExit?: (to: keyof Config["atm"]) => void | Promise<void>;
+  onExit?: (to: keyof Config["transitionGraph"]) => void | Promise<void>;
 }
 
 /** Use this to construct complex types */
 export type InferStateMachineTypes<Config extends StateMachineConfig> = {
   StateMachine: StateMachine<Config>;
-  Logic: StateMachineLogic<Config>;
-  LogicEntry: StateMachineLogicEntry<Config>;
-  LogicHandler: Config["handler"];
-  ATM: Config["atm"];
+  Behaviors: StateMachineBehaviors<Config>;
+  Behavior: StateMachineBehavior<Config>;
+  BehaviorEventHandler: Config["behaviorEventHandler"];
+  TransitionGraph: Config["transitionGraph"];
   Config: Config;
 };
 
 /** Implementations */
 
 export class StateMachine<Config extends StateMachineConfig> {
-  public currentState: keyof Config["atm"];
+  private currentState: keyof Config["transitionGraph"];
 
   constructor(
-    initialState: keyof Config["atm"],
-    private transitions: Config["atm"],
-    private logic: StateMachineLogic<Config>
+    initialState: keyof Config["transitionGraph"],
+    private transitionGraph: Config["transitionGraph"],
+    private behaviors: StateMachineBehaviors<Config>
   ) {
     this.currentState = initialState;
-    this.transitions = transitions;
-    this.logic = logic;
-    void this.logic[this.currentState]?.onEnter?.(null);
+    this.transitionGraph = transitionGraph;
+    this.behaviors = behaviors;
+    void this.behaviors[this.currentState]?.onEnter?.(null);
   }
 
-  fireLogicHandler(...args: Parameters<Config["handler"]>) {
-    const handler = this.logic[this.currentState]?.logicHandler;
+  getCurrentState = () => this.currentState;
+
+  dispatchEvent(...args: Parameters<Config["behaviorEventHandler"]>) {
+    const handler = this.behaviors[this.currentState]?.eventHandler;
     if (handler) return handler(...args);
   }
 
-  canTransition(from: keyof Config["atm"], to: keyof Config["atm"]) {
-    return this.transitions[from].includes(to as string);
+  canTransition(
+    from: keyof Config["transitionGraph"],
+    to: keyof Config["transitionGraph"]
+  ) {
+    return this.transitionGraph[from].includes(to as StateKey);
   }
 
-  async doStateTransition<Params = unknown, ReturnT = unknown>(
-    to: keyof Config["atm"],
+  async transitionTo<Params = unknown, ReturnT = unknown>(
+    to: keyof Config["transitionGraph"],
     params?: Params
   ) {
-    // console.info(
-    //   `transitioning: from "${String(this.currentState)}" => "${String(to)}"`
-    // );
-
     if (this.currentState == to) return;
     if (!this.canTransition(this.currentState, to)) {
       throw new Error(
@@ -87,9 +88,9 @@ export class StateMachine<Config extends StateMachineConfig> {
       );
     }
 
-    await this.logic[this.currentState]?.onExit?.(to);
-    const bufferState = this.currentState;
+    await this.behaviors[this.currentState]?.onExit?.(to);
+    const previousState = this.currentState;
     this.currentState = to;
-    return (await this.logic[to]?.onEnter?.(bufferState, params)) as ReturnT;
+    return (await this.behaviors[to]?.onEnter?.(previousState, params)) as ReturnT;
   }
 }

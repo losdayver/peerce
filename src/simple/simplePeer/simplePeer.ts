@@ -10,14 +10,14 @@ import { StateMachine } from "../../utils/stateMachine";
 import {
   SimplePeerStateMachine,
   SimplePeerStateMachineConfig,
-  SimplePeerStateMachineLogic,
+  SimplePeerStateMachineBehaviors,
   simplePeerStateTransitionMap,
 } from "./stateMeta";
 import { ConnectingToRelay } from "./logic/connectingToRelay";
 import { ConnectingToPeer } from "./logic/connectingToPeer";
 import {
   ConnectedToPeer,
-  ConnectedToPeerLogicHandler,
+  ConnectedToPeerEventHandler,
 } from "./logic/connectedToPeer";
 import { EventEmitter } from "node:stream";
 import { Closing } from "./logic/closing";
@@ -38,12 +38,12 @@ export class SimplePeer {
     this.stateMachine = new StateMachine<SimplePeerStateMachineConfig>(
       "idle",
       simplePeerStateTransitionMap,
-      this.simplePeerStateLogic
+      this.simplePeerStateBehaviors
     );
     this.initialParams = initialParams as Required<SimpleProtocolPeerConfig>;
   }
 
-  simplePeerStateLogic: SimplePeerStateMachineLogic = {
+  simplePeerStateBehaviors: SimplePeerStateMachineBehaviors = {
     connectingToRelay: new ConnectingToRelay(this),
     connectingToPeer: new ConnectingToPeer(this),
     connectedToPeer: new ConnectedToPeer(this),
@@ -55,20 +55,22 @@ export class SimplePeer {
       this.eventEmitter,
       "onConnectedToPeer"
     );
-    await this.stateMachine.doStateTransition("connectingToRelay");
+    await this.stateMachine.transitionTo("connectingToRelay");
     return await sessionPromise;
   };
 
   sendData = ({ fileName, payload }: PeerToPeerMessageDescriptor) => {
-    if (this.stateMachine.currentState !== "connectedToPeer")
-      throw new Error(`Cannot send data on ${this.stateMachine.currentState}`);
-    (this.stateMachine.fireLogicHandler as ConnectedToPeerLogicHandler)({
+    if (this.stateMachine.getCurrentState() !== "connectedToPeer")
+      throw new Error(
+        `Cannot send data on ${this.stateMachine.getCurrentState()}`
+      );
+    (this.stateMachine.dispatchEvent as ConnectedToPeerEventHandler)({
       fileName,
       payload,
     });
   };
 
   close = () => {
-    void this.stateMachine.doStateTransition("closing");
+    void this.stateMachine.transitionTo("closing");
   };
 }

@@ -1,8 +1,7 @@
 import {
-  AvailableTransitionsMap,
-  StateMachine,
+  TransitionGraph,
+  InferStateMachineTypes,
   StateMachineConfig,
-  StateMachineLogic,
 } from "../../utils/stateMachine";
 
 export const simplePeerStateTransitionMap = {
@@ -13,14 +12,16 @@ export const simplePeerStateTransitionMap = {
   closing: ["closed", "error"] as const,
   closed: [] as const,
   error: [] as const,
-} satisfies AvailableTransitionsMap;
+} satisfies TransitionGraph;
 
 export type SimplePeerStateMachineConfig = StateMachineConfig<
   typeof simplePeerStateTransitionMap,
   (params: any) => void
 >;
 
-export type SimplePeerStateMachine = StateMachine<SimplePeerStateMachineConfig>;
-export type SimplePeerStateMachineLogic =
-  StateMachineLogic<SimplePeerStateMachineConfig>;
-export type AvailableStateKeys = keyof SimplePeerStateMachineConfig["atm"];
+export type SimplePeerStateMachine =
+  InferStateMachineTypes<SimplePeerStateMachineConfig>["StateMachine"];
+export type SimplePeerStateMachineBehaviors =
+  InferStateMachineTypes<SimplePeerStateMachineConfig>["Behaviors"];
+export type AvailableStateKeys =
+  InferStateMachineTypes<SimplePeerStateMachineConfig>["TransitionGraph"];

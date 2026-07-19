@@ -1,4 +1,4 @@
-import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
 import { SimplePeerStateMachineConfig } from "../stateMeta";
 import { SimplePeer } from "../simplePeer";
 import { getResolver } from "../../../utils/promiseUtils";
@@ -8,7 +8,7 @@ import {
 } from "../../simpleProtocol";
 import { logInfo } from "../../../utils/logUtils";
 
-export class ConnectingToPeer extends StateMachineLogicEntryBase<SimplePeerStateMachineConfig> {
+export class ConnectingToPeer extends StateMachineBehaviorBase<SimplePeerStateMachineConfig> {
   simplePeer: SimplePeer;
 
   constructor(simplePeer: SimplePeer) {
@@ -83,7 +83,7 @@ export class ConnectingToPeer extends StateMachineLogicEntryBase<SimplePeerState
       peerConnectionListener
     );
 
-    await stateMachine.doStateTransition("connectedToPeer", sessionRequest!);
+    await stateMachine.transitionTo("connectedToPeer", sessionRequest!);
   };
   onExit = () => {
     const { relayAddr, relayPort } = this.simplePeer.initialParams;

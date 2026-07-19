@@ -1,4 +1,4 @@
-import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
 import { SimplePeerStateMachineConfig } from "../stateMeta";
 import { SimplePeer } from "../simplePeer";
 import {
@@ -10,11 +10,11 @@ import { AnsiColor, logInfo, logProgress } from "../../../utils/logUtils";
 import { chunkPeerToPeerMessages } from "../../simpleUtils";
 import { sleep } from "../../../utils/promiseUtils";
 
-export type ConnectedToPeerLogicHandler = (
+export type ConnectedToPeerEventHandler = (
   params: PeerToPeerMessageDescriptor
 ) => void; // todo promise&
 
-export class ConnectedToPeer extends StateMachineLogicEntryBase<SimplePeerStateMachineConfig> {
+export class ConnectedToPeer extends StateMachineBehaviorBase<SimplePeerStateMachineConfig> {
   simplePeer: SimplePeer;
   constructor(simplePeer: SimplePeer) {
     super();
@@ -62,7 +62,7 @@ export class ConnectedToPeer extends StateMachineLogicEntryBase<SimplePeerStateM
     this.chunkCollector.delete(chunk.fileName);
   };
 
-  logicHandler: ConnectedToPeerLogicHandler = async (params) => {
+  eventHandler: ConnectedToPeerEventHandler = async (params) => {
     const { transceiver } = this.simplePeer;
     const { distantAddress, distantPort } = this.sessionRequest!;
     logInfo(`sending "${params.fileName}"`);

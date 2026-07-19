@@ -1,8 +1,8 @@
 import {
-  AvailableTransitionsMap,
+  TransitionGraph,
+  InferStateMachineTypes,
   StateMachine,
   StateMachineConfig,
-  StateMachineLogic,
 } from "../utils/stateMachine";
 import { EventEmitter } from "node:events";
 import * as dgram from "node:dgram";
@@ -23,7 +23,7 @@ const transceiverStateTransitionMap = {
   closing: ["closed", "error"] as const,
   closed: [] as const,
   error: [] as const,
-} satisfies AvailableTransitionsMap;
+} satisfies TransitionGraph;
 
 export interface TransceiverIPv4Params {
   self?: {
@@ -42,14 +42,14 @@ export class TransceiverIPv4 {
     this.stateMachine = new StateMachine<TransceiverIPv4StateMachineConfig>(
       "idle",
       transceiverStateTransitionMap,
-      this.transceiverStateLogic
+      this.transceiverStateBehaviors
     );
   }
 
   private socket: dgram.Socket | undefined;
   private selfAddress: TransceiverIPv4Params["self"] | undefined;
   private sessionMap: Map<string, Session> = new Map();
-  private stateMachine: StateMachine<TransceiverIPv4StateMachineConfig>;
+  private stateMachine: InferStateMachineTypes<TransceiverIPv4StateMachineConfig>["StateMachine"];
 
   private setupSocket = () => {
     this.socket = dgram.createSocket("udp4");
@@ -61,7 +61,7 @@ export class TransceiverIPv4 {
     const socket = this.socket!;
 
     socket.on("error", () => {
-      void this.stateMachine.doStateTransition("error");
+      void this.stateMachine.transitionTo("error");
     });
 
     socket.on("message", (msg, { address, port }) =>
@@ -86,7 +86,7 @@ export class TransceiverIPv4 {
     session?.handleMessage(msg);
   };
 
-  private transceiverStateLogic: StateMachineLogic<TransceiverIPv4StateMachineConfig> =
+  private transceiverStateBehaviors: InferStateMachineTypes<TransceiverIPv4StateMachineConfig>["Behaviors"] =
     {
       listening: {
         onEnter: () => {
@@ -99,7 +99,7 @@ export class TransceiverIPv4 {
         onEnter: () => {
           this.socket?.removeAllListeners();
           this.sessionMap.values().forEach((session) => session.close());
-          void this.stateMachine.doStateTransition("closed");
+          void this.stateMachine.transitionTo("closed");
         },
       },
 
@@ -120,15 +120,19 @@ export class TransceiverIPv4 {
 
   public async listen(self?: TransceiverIPv4Params["self"]) {
     // todo refactor these
-    if (this.stateMachine.currentState != "idle")
-      throw new Error(`cannot listen on ${this.stateMachine.currentState}`);
+    if (this.stateMachine.getCurrentState() != "idle")
+      throw new Error(
+        `cannot listen on ${this.stateMachine.getCurrentState()}`
+      );
 
     this.selfAddress = self;
-    await this.stateMachine.doStateTransition("listening");
+    await this.stateMachine.transitionTo("listening");
   }
   public connect(address: string, port: number) {
-    if (this.stateMachine.currentState != "listening")
-      throw new Error(`cannot connect on ${this.stateMachine.currentState}`);
+    if (this.stateMachine.getCurrentState() != "listening")
+      throw new Error(
+        `cannot connect on ${this.stateMachine.getCurrentState()}`
+      );
 
     const session = new Session(this, address, port);
     this.sessionMap.set(`${address}:${port}`, session);
@@ -139,7 +143,7 @@ export class TransceiverIPv4 {
     if (session) void session.close();
   }
   public close() {
-    void this.stateMachine.doStateTransition("closing");
+    void this.stateMachine.transitionTo("closing");
   }
   public send(address: string, port: number, msg: string | Buffer) {
     const session = this.sessionMap.get(`${address}:${port}`);

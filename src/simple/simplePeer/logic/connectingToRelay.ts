@@ -1,11 +1,11 @@
-import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
 import { SimplePeerStateMachineConfig } from "../stateMeta";
 import { SimplePeer } from "../simplePeer";
 import { getResolver } from "../../../utils/promiseUtils";
 import { logInfo } from "../../../utils/logUtils";
 import { TransceiverIPv4Params } from "../../../transport/transceiver";
 
-export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStateMachineConfig> {
+export class ConnectingToRelay extends StateMachineBehaviorBase<SimplePeerStateMachineConfig> {
   simplePeer: SimplePeer;
 
   constructor(simplePeer: SimplePeer) {
@@ -37,6 +37,6 @@ export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStat
 
     transceiver.eventEmitter.removeListener("onConnected", listener);
 
-    await stateMachine.doStateTransition("connectingToPeer");
+    await stateMachine.transitionTo("connectingToPeer");
   };
 }
