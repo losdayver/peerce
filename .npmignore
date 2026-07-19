@@ -1,7 +1,8 @@
 .vscode/
 misc/
 src/
-.gitignore/
+node_modules/
+.gitignore
 .prettierrc
 eslint.config.js
 jest.config.js

@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist/cjs",
+    "outDir": "dist/esm",
 
     "target": "esnext",
 
@@ -19,6 +19,9 @@
     "noImplicitAny": false,
 
     "noEmitOnError": true,
+
+    "declaration": true,
+    "declarationDir": "types",
 
     "paths": {
       "@src/*": ["./src/*"]

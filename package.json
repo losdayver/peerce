@@ -1,28 +1,36 @@
 {
   "name": "peerce",
-  "version": "1.0.3",
-  "description": "Simple udp file transfer module based on NAT hole punching",
+  "version": "1.0.4",
+  "description": "Simple UDP data transfer package based on NAT hole punching",
   "scripts": {
     "test": "npx tsc && jest",
-    "complete-build": "npm i && npx tsc && npm pack"
+    "complete-build": "npm i && npx tsc && npx tsc -p tsconfig.esm.json && npm pack"
+  },
+  "exports": {
+    ".": {
+      "types": "./types",
+      "import": "./dist/mjs/exports/main.js",
+      "require": "./dist/cjs/exports/main.js"
+    }
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "bin": {
-    "peerce": "./dist/simple/bin/peer.js",
-    "peerce-relay": "./dist/simple/bin/relay.js"
+    "peerce": "./dist/cjs/simple/bin/peer.js",
+    "peerce-relay": "./dist/cjs/simple/bin/relay.js"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
     "@typescript-eslint/eslint-plugin": "^8.59.0",
     "@typescript-eslint/parser": "^8.59.0",
     "eslint": "^10.2.1",
-    "@types/jest": "^30.0.0",
     "jest": "^30.3.0"
   },
   "dependencies": {
-    "module-alias": "^2.3.4"
+    "module-alias": "^2.3.4",
+    "zod": "^4.4.3"
   },
   "_moduleAliases": {
     "@src": "dist",
