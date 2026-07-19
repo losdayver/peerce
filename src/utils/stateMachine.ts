@@ -18,7 +18,7 @@ type StateMachineBehaviors<Config extends StateMachineConfig> = {
 
 export type StateMachineConfig<
   Transitions extends TransitionGraph = TransitionGraph,
-  EventHandler extends Function = (...args) => void,
+  EventHandler extends (...args: any[]) => unknown = (...args: any[]) => void,
 > = {
   transitionGraph: Transitions;
   behaviorEventHandler: EventHandler;
@@ -50,30 +50,41 @@ export type InferStateMachineTypes<Config extends StateMachineConfig> = {
 /** Implementations */
 
 export class StateMachine<Config extends StateMachineConfig> {
-  private currentState: keyof Config["transitionGraph"];
+  private currentState: keyof Config["transitionGraph"] | null = null;
+  private started = false;
 
   constructor(
-    initialState: keyof Config["transitionGraph"],
+    private initialState: keyof Config["transitionGraph"],
     private transitionGraph: Config["transitionGraph"],
-    private behaviors: StateMachineBehaviors<Config>
+    private behaviors: StateMachineBehaviors<Config>,
+    /** Invoke "start" method in constructor */
+    implicitStart = true
   ) {
-    this.currentState = initialState;
-    this.transitionGraph = transitionGraph;
-    this.behaviors = behaviors;
-    void this.behaviors[this.currentState]?.onEnter?.(null);
+    if (implicitStart) void this.start();
   }
+
+  start = async () => {
+    if (this.started) throw new Error("Cannot start twice");
+    this.currentState = this.initialState;
+    this.started = true;
+    await this.behaviors[this.currentState]?.onEnter?.(null);
+  };
 
   getCurrentState = () => this.currentState;
 
   dispatchEvent(...args: Parameters<Config["behaviorEventHandler"]>) {
+    if (this.currentState == null)
+      throw new Error("Cannot dispatch event before state machine start");
+
     const handler = this.behaviors[this.currentState]?.eventHandler;
     if (handler) return handler(...args);
   }
 
   canTransition(
-    from: keyof Config["transitionGraph"],
+    from: keyof Config["transitionGraph"] | null,
     to: keyof Config["transitionGraph"]
   ) {
+    if (from == null) return false;
     return this.transitionGraph[from].includes(to as StateKey);
   }
 
@@ -81,6 +92,9 @@ export class StateMachine<Config extends StateMachineConfig> {
     to: keyof Config["transitionGraph"],
     params?: Params
   ) {
+    if (this.currentState == null)
+      throw new Error("Cannot transition before state machine start");
+
     if (this.currentState == to) return;
     if (!this.canTransition(this.currentState, to)) {
       throw new Error(
@@ -91,6 +105,9 @@ export class StateMachine<Config extends StateMachineConfig> {
     await this.behaviors[this.currentState]?.onExit?.(to);
     const previousState = this.currentState;
     this.currentState = to;
-    return (await this.behaviors[to]?.onEnter?.(previousState, params)) as ReturnT;
+    return (await this.behaviors[to]?.onEnter?.(
+      previousState,
+      params
+    )) as ReturnT;
   }
 }
