@@ -1,15 +1,15 @@
-import { StateMachine } from "@src/utils/stateMachine";
+import { StateMachine } from "../../utils/stateMachine";
 import {
   Message,
   MessageBuffer,
   MessageType,
-} from "@src/transport/messageBuffer";
-import { TransceiverIPv4 } from "@src/transport/transceiver";
+} from "../messageBuffer";
+import { TransceiverIPv4 } from "../transceiver";
 import {
   SessionLogicHandlerAction,
   SessionSMTypes,
   sessionStateTransitionMap,
-} from "@src/transport/session/sessionMeta";
+} from "./sessionMeta";
 import { ConnectingState } from "./logic/connectingState";
 import { ConnectedState } from "./logic/connectedState";
 import { ClosingState } from "./logic/closingState";

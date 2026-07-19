@@ -1,12 +1,12 @@
-import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
-import { SimplePeerStateMachineConfig } from "@src/simple/simplePeer/stateMeta";
-import { SimplePeer } from "@src/simple/simplePeer/simplePeer";
-import { getResolver } from "@src/utils/promiseUtils";
+import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { SimplePeerStateMachineConfig } from "../stateMeta";
+import { SimplePeer } from "../simplePeer";
+import { getResolver } from "../../../utils/promiseUtils";
 import {
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
-} from "@src/simple/simpleProtocol";
-import { logInfo } from "@src/utils/logUtils";
+} from "../../simpleProtocol";
+import { logInfo } from "../../../utils/logUtils";
 
 export class ConnectingToPeer extends StateMachineLogicEntryBase<SimplePeerStateMachineConfig> {
   simplePeer: SimplePeer;

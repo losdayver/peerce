@@ -1,16 +1,16 @@
-import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
+import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
 import {
   SessionLogicHandlerAction,
   SessionSMTypes,
-} from "@src/transport/session/sessionMeta";
-import { Session } from "@src/transport/session/session";
+} from "../sessionMeta";
+import { Session } from "../session";
 import {
   DataAckMessage,
   DataMessage,
   MessageBuffer,
   MessageType,
-} from "@src/transport/messageBuffer";
-import { sleep } from "@src/utils/promiseUtils";
+} from "../../messageBuffer";
+import { sleep } from "../../../utils/promiseUtils";
 
 export class ConnectedState extends StateMachineLogicEntryBase<
   SessionSMTypes["Config"]

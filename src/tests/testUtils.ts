@@ -1,4 +1,4 @@
-import { PeerProxy } from "@src/simple/simpleRelay";
+import { PeerProxy } from "../simple/simpleRelay";
 import * as dgram from "node:dgram";
 
 export class PeerLossyProxy extends PeerProxy {

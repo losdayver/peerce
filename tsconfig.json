@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist/cjs",
+    "outDir": "dist",
 
     "target": "esnext",
 
@@ -18,11 +18,7 @@
     "strictNullChecks": true,
     "noImplicitAny": false,
 
-    "noEmitOnError": true,
-
-    "paths": {
-      "@src/*": ["./src/*"]
-    }
+    "noEmitOnError": true
   },
   "include": ["src"]
 }

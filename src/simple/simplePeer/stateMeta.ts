@@ -3,7 +3,7 @@ import {
   StateMachine,
   StateMachineConfig,
   StateMachineLogic,
-} from "@src/utils/stateMachine";
+} from "../../utils/stateMachine";
 
 export const simplePeerStateTransitionMap = {
   idle: ["connectingToRelay", "error"] as const,

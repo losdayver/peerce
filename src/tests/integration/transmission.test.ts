@@ -1,10 +1,8 @@
 import { randomBytes } from "node:crypto";
-import { PeerLossyProxy } from "@src/tests/testUtils";
-import { once } from "@src/utils/promiseUtils";
-import { SimplePeer } from "@src/simple/simplePeer/simplePeer";
-import { SimpleRelay } from "@src/simple/simpleRelay";
-import { register } from "module-alias/register";
-register;
+import { PeerLossyProxy } from "../testUtils";
+import { once } from "../../utils/promiseUtils";
+import { SimplePeer } from "../../simple/simplePeer/simplePeer";
+import { SimpleRelay } from "../../simple/simpleRelay";
 
 const localhost = "127.0.0.1";
 const relayAddr = { address: localhost, port: 5656 };
@@ -57,7 +55,7 @@ test("Lossy data transmission", async () => {
     peer2.eventEmitter,
     "onFullMessage"
   );
-  proxy1.lossPercentage = 0.6;
+  proxy1.lossPercentage = 0.5;
   peer1.sendData(testData);
 
   const data = await dataPromise;

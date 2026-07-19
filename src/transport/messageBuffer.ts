@@ -1,5 +1,5 @@
-import { chunkBuffer, crc32 } from "@src/utils/bufferUtils";
-import { logWarning } from "@src/utils/logUtils";
+import { chunkBuffer, crc32 } from "../utils/bufferUtils";
+import { logWarning } from "../utils/logUtils";
 import { randomBytes } from "node:crypto";
 
 export const enum MessageType {

@@ -3,10 +3,10 @@ import {
   StateMachine,
   StateMachineConfig,
   StateMachineLogic,
-} from "@src/utils/stateMachine";
+} from "../utils/stateMachine";
 import { EventEmitter } from "node:events";
 import * as dgram from "node:dgram";
-import { Session } from "@src/transport/session/session";
+import { Session } from "./session/session";
 import { MessageBuffer, MessageType } from "./messageBuffer";
 
 interface TransceiverEventEmitterMap {

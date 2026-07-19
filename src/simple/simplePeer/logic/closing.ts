@@ -1,6 +1,6 @@
-import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
-import { SimplePeerStateMachineConfig } from "@src/simple/simplePeer/stateMeta";
-import { SimplePeer } from "@src/simple/simplePeer/simplePeer";
+import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { SimplePeerStateMachineConfig } from "../stateMeta";
+import { SimplePeer } from "../simplePeer";
 
 export class Closing extends StateMachineLogicEntryBase<SimplePeerStateMachineConfig> {
   simplePeer: SimplePeer;

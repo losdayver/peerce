@@ -1,7 +1,7 @@
-import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
-import { SessionSMTypes } from "@src/transport/session/sessionMeta";
-import { Session } from "@src/transport/session/session";
-import { MessageBuffer, MessageType } from "@src/transport/messageBuffer";
+import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { SessionSMTypes } from "../sessionMeta";
+import { Session } from "../session";
+import { MessageBuffer, MessageType } from "../../messageBuffer";
 
 export class ClosingState extends StateMachineLogicEntryBase<
   SessionSMTypes["Config"]

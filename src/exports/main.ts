@@ -1,5 +1,5 @@
-import { SimplePeer as SimplePeerExport } from "@src/simple/simplePeer/simplePeer";
-import { SimpleRelay as SimpleRelayExport } from "@src/simple/simpleRelay";
+import { SimplePeer as SimplePeerExport } from "../simple/simplePeer/simplePeer";
+import { SimpleRelay as SimpleRelayExport } from "../simple/simpleRelay";
 
 export const SimplePeer = SimplePeerExport;
 export const SimpleRelay = SimpleRelayExport;

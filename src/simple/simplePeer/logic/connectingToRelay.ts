@@ -1,9 +1,9 @@
-import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
-import { SimplePeerStateMachineConfig } from "@src/simple/simplePeer/stateMeta";
-import { SimplePeer } from "@src/simple/simplePeer/simplePeer";
-import { getResolver } from "@src/utils/promiseUtils";
-import { logInfo } from "@src/utils/logUtils";
-import { TransceiverIPv4Params } from "@src/transport/transceiver";
+import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { SimplePeerStateMachineConfig } from "../stateMeta";
+import { SimplePeer } from "../simplePeer";
+import { getResolver } from "../../../utils/promiseUtils";
+import { logInfo } from "../../../utils/logUtils";
+import { TransceiverIPv4Params } from "../../../transport/transceiver";
 
 export class ConnectingToRelay extends StateMachineLogicEntryBase<SimplePeerStateMachineConfig> {
   simplePeer: SimplePeer;

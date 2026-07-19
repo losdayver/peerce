@@ -6,19 +6,14 @@
     "test": "npx tsc && jest",
     "complete-build": "npm i && npx tsc && npx tsc -p tsconfig.esm.json && npm pack"
   },
-  "exports": {
-    ".": {
-      "types": "./types",
-      "import": "./dist/mjs/exports/main.js",
-      "require": "./dist/cjs/exports/main.js"
-    }
-  },
+  "main": "./dist/exports/main.js",
+  "types": "./types/exports/main.d.ts",
   "keywords": [],
   "author": "",
   "license": "MIT",
   "bin": {
-    "peerce": "./dist/cjs/simple/bin/peer.js",
-    "peerce-relay": "./dist/cjs/simple/bin/relay.js"
+    "peerce": "./dist/simple/bin/peer.js",
+    "peerce-relay": "./dist/simple/bin/relay.js"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -29,11 +24,6 @@
     "jest": "^30.3.0"
   },
   "dependencies": {
-    "module-alias": "^2.3.4",
     "zod": "^4.4.3"
-  },
-  "_moduleAliases": {
-    "@src": "dist",
-    "@cfg": "cfg"
   }
 }

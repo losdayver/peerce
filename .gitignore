@@ -1,5 +1,5 @@
 node_modules/
 dist/
 misc/
-p2p_messenger-*.tgz
+*.tgz
 types/

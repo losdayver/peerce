@@ -1,10 +1,10 @@
 import * as z from "zod";
-import { TransceiverIPv4 } from "@src/transport/transceiver";
+import { TransceiverIPv4 } from "../transport/transceiver";
 import {
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
 } from "./simpleProtocol";
-import { AnsiColor, colorLog, logInfo } from "@src/utils/logUtils";
+import { AnsiColor, colorLog, logInfo } from "../utils/logUtils";
 
 export abstract class PeerProxy {
   constructor(

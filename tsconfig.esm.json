@@ -22,10 +22,7 @@
 
     "declaration": true,
     "declarationDir": "types",
-
-    "paths": {
-      "@src/*": ["./src/*"]
-    }
+    "emitDeclarationOnly": true
   },
   "include": ["src"]
 }

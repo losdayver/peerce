@@ -3,7 +3,7 @@ import { argv } from "node:process";
 import {
   SimpleProtocolConfig,
   SimpleProtocolRelayConfig,
-} from "@src/simple/simpleProtocol";
+} from "../simple/simpleProtocol";
 
 export interface FullConfig
   extends SimpleProtocolConfig, SimpleProtocolRelayConfig {}

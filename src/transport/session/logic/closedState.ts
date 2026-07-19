@@ -1,6 +1,6 @@
-import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
-import { SessionSMTypes } from "@src/transport/session/sessionMeta";
-import { Session } from "@src/transport/session/session";
+import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { SessionSMTypes } from "../sessionMeta";
+import { Session } from "../session";
 
 export class ClosedState extends StateMachineLogicEntryBase<
   SessionSMTypes["Config"]

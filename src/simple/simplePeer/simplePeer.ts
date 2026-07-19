@@ -1,12 +1,12 @@
-import { TransceiverIPv4 } from "@src/transport/transceiver";
+import { TransceiverIPv4 } from "../../transport/transceiver";
 import {
   PeerToPeerMessageDescriptor,
   PeerToPeerSessionRequest,
   SimpleProtocolConfig,
   SimpleProtocolPeerConfig,
-} from "@src/simple/simpleProtocol";
-import { once } from "@src/utils/promiseUtils";
-import { StateMachine } from "@src/utils/stateMachine";
+} from "../simpleProtocol";
+import { once } from "../../utils/promiseUtils";
+import { StateMachine } from "../../utils/stateMachine";
 import {
   SimplePeerStateMachine,
   SimplePeerStateMachineConfig,

@@ -1,10 +1,10 @@
-import { MessageType } from "@src/transport/messageBuffer";
-import { Session } from "@src/transport/session/session";
+import { MessageType } from "../../messageBuffer";
+import { Session } from "../session";
 import {
   SessionLogicHandlerAction,
   SessionSMTypes,
-} from "@src/transport/session/sessionMeta";
-import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
+} from "../sessionMeta";
+import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
 
 export class ConnectingState extends StateMachineLogicEntryBase<
   SessionSMTypes["Config"]

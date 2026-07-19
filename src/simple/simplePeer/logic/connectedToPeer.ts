@@ -1,14 +1,14 @@
-import { StateMachineLogicEntryBase } from "@src/utils/stateMachine";
-import { SimplePeerStateMachineConfig } from "@src/simple/simplePeer/stateMeta";
-import { SimplePeer } from "@src/simple/simplePeer/simplePeer";
+import { StateMachineLogicEntryBase } from "../../../utils/stateMachine";
+import { SimplePeerStateMachineConfig } from "../stateMeta";
+import { SimplePeer } from "../simplePeer";
 import {
   PeerToPeerMessage,
   PeerToPeerMessageDescriptor,
   PeerToPeerSessionRequest,
-} from "@src/simple/simpleProtocol";
-import { AnsiColor, logInfo, logProgress } from "@src/utils/logUtils";
-import { chunkPeerToPeerMessages } from "@src/simple/simpleUtils";
-import { sleep } from "@src/utils/promiseUtils";
+} from "../../simpleProtocol";
+import { AnsiColor, logInfo, logProgress } from "../../../utils/logUtils";
+import { chunkPeerToPeerMessages } from "../../simpleUtils";
+import { sleep } from "../../../utils/promiseUtils";
 
 export type ConnectedToPeerLogicHandler = (
   params: PeerToPeerMessageDescriptor

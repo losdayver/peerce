@@ -2,8 +2,8 @@ import {
   AvailableTransitionsMap,
   InferStateMachineTypes,
   StateMachineConfig,
-} from "@src/utils/stateMachine";
-import { Message } from "@src/transport/messageBuffer";
+} from "../../utils/stateMachine";
+import { Message } from "../messageBuffer";
 
 export const sessionStateTransitionMap = {
   idle: ["connecting", "error"] as const,

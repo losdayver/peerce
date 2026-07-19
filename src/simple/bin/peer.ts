@@ -1,11 +1,9 @@
 #!/usr/bin/env node
-import { register } from "module-alias/register";
-register;
 import { SimplePeer } from "../simplePeer/simplePeer";
-import { envConfig, FullConfig } from "@src/utils/configConstructor";
+import { envConfig, FullConfig } from "../../utils/configConstructor";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, basename } from "node:path";
-import { logInfo } from "@src/utils/logUtils";
+import { logInfo } from "../../utils/logUtils";
 
 // node ./dist/simple/bin/peer.js --relayAddr 127.0.0.1 --relayPort 5555 --selfTag me --distantTag other --payload testpayload
 // p2p-s-peer --relayAddr 127.0.0.1 --relayPort 5555 --selfTag me --distantTag other --payload testpayload

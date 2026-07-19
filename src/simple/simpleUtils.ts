@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { PeerToPeerMessage } from "@src/simple/simpleProtocol";
+import { PeerToPeerMessage } from "./simpleProtocol";
 
 export const chunkPeerToPeerMessages = ({
   payload,
