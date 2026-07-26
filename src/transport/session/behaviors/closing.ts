@@ -17,7 +17,7 @@ export class ClosingBehavior extends StateShifterBehaviorBase<
       const {
         buffers: [msg],
       } = MessageBuffer.construct({ type: MessageType.FIN });
-      this.session.transceiverIPv4.__send(
+      this.session.transceiverIPv4.sendDatagram(
         this.session.address,
         this.session.port,
         msg

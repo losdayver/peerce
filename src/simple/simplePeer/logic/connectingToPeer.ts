@@ -37,7 +37,7 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
         peerRequestResolver.resolve?.();
       }
     };
-    transceiver.eventEmitter.addListener("onReceive", sessionRequestListener);
+    transceiver.addListener("onReceive", sessionRequestListener);
 
     transceiver.send(
       relayAddr,
@@ -49,7 +49,7 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     );
 
     await peerRequestPromise;
-    transceiver.eventEmitter.removeListener(
+    transceiver.removeListener(
       "onReceive",
       sessionRequestListener
     );
@@ -75,19 +75,19 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
       )
         connResolver.resolve?.();
     };
-    transceiver.eventEmitter.addListener("onConnected", peerConnectionListener);
+    transceiver.addListener("onConnected", peerConnectionListener);
     await connPromise;
 
-    transceiver.eventEmitter.removeListener(
+    transceiver.removeListener(
       "onConnected",
       peerConnectionListener
     );
 
     await stateMachine.shiftTo("connectedToPeer", sessionRequest!);
   };
-  onExit = () => {
+  onExit = async () => {
     const { relayAddr, relayPort } = this.simplePeer.initialParams;
     logInfo(`closed relay connection`);
-    this.simplePeer.transceiver.closeSession(relayAddr, relayPort);
+    await this.simplePeer.transceiver.closeSession(relayAddr, relayPort);
   };
 }

@@ -15,7 +15,7 @@ export interface SessionEventMap {
 }
 
 export const sessionStateTransitionMap = {
-  idle: ["connecting", "error"] as const,
+  idle: ["connecting", "closing", "error"] as const,
   connecting: ["connected", "closing", "error"] as const,
   connected: ["closing", "error"] as const,
   closing: ["closed", "error"] as const,

@@ -100,10 +100,10 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
 
     this.simplePeer.eventEmitter.emit("onConnectedToPeer", sessionRequest);
 
-    transceiver.eventEmitter.on("onReceive", this.onReceiveMsg);
+    transceiver.on("onReceive", this.onReceiveMsg);
   };
   onExit = () => {
-    this.simplePeer.transceiver.eventEmitter.off(
+    this.simplePeer.transceiver.off(
       "onReceive",
       this.onReceiveMsg
     );

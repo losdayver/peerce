@@ -160,7 +160,7 @@ export class ConnectedBehavior extends StateShifterBehaviorBase<
           break;
         }
         case MessageType.FIN:
-          this.session.close();
+          void this.session.close();
       }
     } else if (action == SessionStateEventAction.SEND_DATA) {
       this.dataSender.registerNewTransmission(payload);
@@ -255,7 +255,11 @@ class Transmission {
         const hasAck = this.dataAckMap.get(i);
 
         if (!hasAck) {
-          transceiverIPv4.__send(address, port, this.constructed!.buffers[i]);
+          transceiverIPv4.sendDatagram(
+            address,
+            port,
+            this.constructed!.buffers[i]
+          );
         }
         await sleep(1);
       }
@@ -279,7 +283,7 @@ class Transmission {
     const { session } = this.connectedState;
     const { transceiverIPv4, address, port } = session;
     for (const buffer of this.constructed!.buffers)
-      transceiverIPv4.__send(address, port, buffer);
+      transceiverIPv4.sendDatagram(address, port, buffer);
     this.resetResendTimer();
   };
 

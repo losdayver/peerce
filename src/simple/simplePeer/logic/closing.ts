@@ -12,6 +12,6 @@ export class Closing extends StateShifterBehaviorBase<SimplePeerStateShifterConf
 
   onEnter = async () => {
     const { transceiver } = this.simplePeer;
-    transceiver.close();
+    await transceiver.close();
   };
 }

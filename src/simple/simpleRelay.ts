@@ -36,8 +36,8 @@ export class SimpleRelay {
     this.transceiver = new TransceiverIPv4();
     void this.transceiver.listen({ address, port });
 
-    this.transceiver.eventEmitter.on("onReceive", this.onReceiveFromPeer);
-    this.transceiver.eventEmitter.on("onSessionClosed", this.onSessionClosed);
+    this.transceiver.on("onReceive", this.onReceiveFromPeer);
+    this.transceiver.on("onSessionClosed", this.onSessionClosed);
   }
 
   onSessionClosed = (address: string, port: number) => {

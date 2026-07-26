@@ -51,6 +51,8 @@ export class MessageBuffer {
   static maxPayloadSize = 500;
 
   static decode(buffer: Buffer): Message | null {
+    if (buffer.length < HEADER_SIZE) return null;
+
     const payloadSize = buffer.length - HEADER_SIZE;
 
     const checksum = buffer.readUIntBE(HEADER_SIZE - SUM_SIZE, SUM_SIZE);

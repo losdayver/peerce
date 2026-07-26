@@ -28,6 +28,7 @@ export class Session extends EventEmitter<SessionEventMap> {
   }
 
   stateMachine: SessionSMTypes["StateShifter"];
+  private closePromise: Promise<void> | undefined;
 
   private sessionStateBehaviors: SessionSMTypes["Behaviors"] = {
     connecting: new ConnectingBehavior(this),
@@ -37,7 +38,7 @@ export class Session extends EventEmitter<SessionEventMap> {
   };
 
   sendOne(message: Message) {
-    this.transceiverIPv4.__send(
+    this.transceiverIPv4.sendDatagram(
       this.address,
       this.port,
       MessageBuffer.construct(message).buffers[0]
@@ -74,12 +75,20 @@ export class Session extends EventEmitter<SessionEventMap> {
     ]);
   };
 
-  close = () => {
-    void this.stateMachine.shiftTo("closing");
+  close = () => this.closeAsync();
+
+  closeAsync = () => {
+    this.closePromise ??= this.performClose();
+    return this.closePromise;
   };
 
-  closeAsync = async () => {
-    void this.stateMachine.shiftTo("closing");
-    await once(this, "closed");
+  private performClose = async () => {
+    const state = this.stateMachine.getCurrentState();
+    if (state === "closed" || state === "error") return;
+
+    const closedPromise = once(this, "closed");
+    if (state !== "closing")
+      await this.stateMachine.shiftTo("closing");
+    await closedPromise;
   };
 }

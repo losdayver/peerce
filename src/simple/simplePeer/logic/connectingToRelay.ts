@@ -30,12 +30,12 @@ export class ConnectingToRelay extends StateShifterBehaviorBase<SimplePeerStateS
     const listener = (address: string, port: number) => {
       if (address == relayAddr && relayPort == port) connResolver.resolve?.();
     };
-    transceiver.eventEmitter.addListener("onConnected", listener);
+    transceiver.addListener("onConnected", listener);
     await connPromise;
 
     logInfo(`connected to relay ${relayAddr}:${relayPort}`);
 
-    transceiver.eventEmitter.removeListener("onConnected", listener);
+    transceiver.removeListener("onConnected", listener);
 
     await stateMachine.shiftTo("connectingToPeer");
   };
