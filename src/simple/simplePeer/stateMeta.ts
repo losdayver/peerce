@@ -1,8 +1,8 @@
 import {
   TransitionGraph,
-  InferStateMachineTypes,
-  StateMachineConfig,
-} from "../../utils/stateMachine";
+  InferStateShifterTypes,
+  StateShifterConfig,
+} from "state-shifter";
 
 export const simplePeerStateTransitionMap = {
   idle: ["connectingToRelay", "error"] as const,
@@ -14,14 +14,14 @@ export const simplePeerStateTransitionMap = {
   error: [] as const,
 } satisfies TransitionGraph;
 
-export type SimplePeerStateMachineConfig = StateMachineConfig<
+export type SimplePeerStateShifterConfig = StateShifterConfig<
   typeof simplePeerStateTransitionMap,
   (params: any) => void
 >;
 
-export type SimplePeerStateMachine =
-  InferStateMachineTypes<SimplePeerStateMachineConfig>["StateMachine"];
-export type SimplePeerStateMachineBehaviors =
-  InferStateMachineTypes<SimplePeerStateMachineConfig>["Behaviors"];
+export type SimplePeerStateShifter =
+  InferStateShifterTypes<SimplePeerStateShifterConfig>["StateShifter"];
+export type SimplePeerStateShifterBehaviors =
+  InferStateShifterTypes<SimplePeerStateShifterConfig>["Behaviors"];
 export type AvailableStateKeys =
-  InferStateMachineTypes<SimplePeerStateMachineConfig>["TransitionGraph"];
+  InferStateShifterTypes<SimplePeerStateShifterConfig>["TransitionGraph"];

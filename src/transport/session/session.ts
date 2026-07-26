@@ -1,36 +1,39 @@
-import { StateMachine } from "../../utils/stateMachine";
-import { Message, MessageBuffer, MessageType } from "../messageBuffer";
+import { EventEmitter, once } from "node:stream";
+import { Message, MessageBuffer } from "../messageBuffer";
 import { TransceiverIPv4 } from "../transceiver";
+import { ClosedBehavior } from "./behaviors/closed";
+import { ClosingBehavior } from "./behaviors/closing";
+import { ConnectedBehavior } from "./behaviors/connected";
+import { ConnectingBehavior } from "./behaviors/connecting";
 import {
   SessionStateEventAction,
   SessionSMTypes,
   sessionStateTransitionMap,
+  SessionEventMap,
 } from "./sessionMeta";
-import { ConnectingState } from "./logic/connectingState";
-import { ConnectedState } from "./logic/connectedState";
-import { ClosingState } from "./logic/closingState";
-import { ClosedState } from "./logic/closedState";
+import { StateShifter } from "state-shifter";
 
-export class Session {
+export class Session extends EventEmitter<SessionEventMap> {
   constructor(
     public transceiverIPv4: TransceiverIPv4,
     public address: string,
     public port: number
   ) {
-    this.stateMachine = new StateMachine<SessionSMTypes["Config"]>(
+    super();
+    this.stateMachine = new StateShifter<SessionSMTypes["Config"]>(
       "idle",
       sessionStateTransitionMap,
       this.sessionStateBehaviors
     );
   }
 
-  stateMachine: SessionSMTypes["StateMachine"];
+  stateMachine: SessionSMTypes["StateShifter"];
 
   private sessionStateBehaviors: SessionSMTypes["Behaviors"] = {
-    connecting: new ConnectingState(this),
-    connected: new ConnectedState(this),
-    closing: new ClosingState(this),
-    closed: new ClosedState(this),
+    connecting: new ConnectingBehavior(this),
+    connected: new ConnectedBehavior(this),
+    closing: new ClosingBehavior(this),
+    closed: new ClosedBehavior(this),
   };
 
   sendOne(message: Message) {
@@ -59,12 +62,24 @@ export class Session {
   }
 
   connect = () => {
-    void this.stateMachine.transitionTo("connecting");
-    // todo await for connection event
+    void this.stateMachine.shiftTo("connecting");
+  };
+
+  connectAsync = async () => {
+    void this.stateMachine.shiftTo("connecting");
+    await Promise.race([
+      once(this, "connected"),
+      once(this, "closed"),
+      once(this, "error"),
+    ]);
   };
 
   close = () => {
-    void this.stateMachine.transitionTo("closing");
-    // todo await for closed event
+    void this.stateMachine.shiftTo("closing");
+  };
+
+  closeAsync = async () => {
+    void this.stateMachine.shiftTo("closing");
+    await once(this, "closed");
   };
 }

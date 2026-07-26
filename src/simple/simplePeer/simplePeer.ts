@@ -6,11 +6,10 @@ import {
   SimpleProtocolPeerConfig,
 } from "../simpleProtocol";
 import { once } from "../../utils/promiseUtils";
-import { StateMachine } from "../../utils/stateMachine";
 import {
-  SimplePeerStateMachine,
-  SimplePeerStateMachineConfig,
-  SimplePeerStateMachineBehaviors,
+  SimplePeerStateShifter,
+  SimplePeerStateShifterConfig,
+  SimplePeerStateShifterBehaviors,
   simplePeerStateTransitionMap,
 } from "./stateMeta";
 import { ConnectingToRelay } from "./logic/connectingToRelay";
@@ -21,6 +20,7 @@ import {
 } from "./logic/connectedToPeer";
 import { EventEmitter } from "node:stream";
 import { Closing } from "./logic/closing";
+import { StateShifter } from "state-shifter";
 
 interface SimplePeerEventEmitterMap {
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
@@ -29,13 +29,13 @@ interface SimplePeerEventEmitterMap {
 
 export class SimplePeer {
   transceiver: TransceiverIPv4;
-  stateMachine: SimplePeerStateMachine;
+  stateMachine: SimplePeerStateShifter;
   eventEmitter = new EventEmitter<SimplePeerEventEmitterMap>();
   initialParams: Required<SimpleProtocolPeerConfig>;
 
   constructor(initialParams: SimpleProtocolPeerConfig) {
     this.transceiver = new TransceiverIPv4();
-    this.stateMachine = new StateMachine<SimplePeerStateMachineConfig>(
+    this.stateMachine = new StateShifter<SimplePeerStateShifterConfig>(
       "idle",
       simplePeerStateTransitionMap,
       this.simplePeerStateBehaviors
@@ -43,7 +43,7 @@ export class SimplePeer {
     this.initialParams = initialParams as Required<SimpleProtocolPeerConfig>;
   }
 
-  simplePeerStateBehaviors: SimplePeerStateMachineBehaviors = {
+  simplePeerStateBehaviors: SimplePeerStateShifterBehaviors = {
     connectingToRelay: new ConnectingToRelay(this),
     connectingToPeer: new ConnectingToPeer(this),
     connectedToPeer: new ConnectedToPeer(this),
@@ -55,7 +55,7 @@ export class SimplePeer {
       this.eventEmitter,
       "onConnectedToPeer"
     );
-    await this.stateMachine.transitionTo("connectingToRelay");
+    await this.stateMachine.shiftTo("connectingToRelay");
     return await sessionPromise;
   };
 
@@ -71,6 +71,6 @@ export class SimplePeer {
   };
 
   close = () => {
-    void this.stateMachine.transitionTo("closing");
+    void this.stateMachine.shiftTo("closing");
   };
 }

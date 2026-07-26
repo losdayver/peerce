@@ -1,5 +1,4 @@
-import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
-import { SimplePeerStateMachineConfig } from "../stateMeta";
+import { SimplePeerStateShifterConfig } from "../stateMeta";
 import { SimplePeer } from "../simplePeer";
 import {
   PeerToPeerMessage,
@@ -9,12 +8,13 @@ import {
 import { AnsiColor, logInfo, logProgress } from "../../../utils/logUtils";
 import { chunkPeerToPeerMessages } from "../../simpleUtils";
 import { sleep } from "../../../utils/promiseUtils";
+import { StateShifterBehaviorBase } from "state-shifter";
 
 export type ConnectedToPeerEventHandler = (
   params: PeerToPeerMessageDescriptor
 ) => void; // todo promise&
 
-export class ConnectedToPeer extends StateMachineBehaviorBase<SimplePeerStateMachineConfig> {
+export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
   simplePeer: SimplePeer;
   constructor(simplePeer: SimplePeer) {
     super();

@@ -1,9 +1,18 @@
 import {
+  InferStateShifterTypes,
+  StateShifterConfig,
   TransitionGraph,
-  InferStateMachineTypes,
-  StateMachineConfig,
-} from "../../utils/stateMachine";
+} from "state-shifter";
 import { Message } from "../messageBuffer";
+
+export interface SessionEventMap {
+  connecting: [];
+  connected: [];
+  receive: [message: Buffer];
+  closing: [];
+  closed: [];
+  error: [];
+}
 
 export const sessionStateTransitionMap = {
   idle: ["connecting", "error"] as const,
@@ -29,9 +38,9 @@ type SessionStateEvent =
       payload: string | Buffer;
     };
 
-type SessionSMConfig = StateMachineConfig<
+type SessionSMConfig = StateShifterConfig<
   typeof sessionStateTransitionMap,
   (params: SessionStateEvent) => void
 >;
 
-export type SessionSMTypes = InferStateMachineTypes<SessionSMConfig>;
+export type SessionSMTypes = InferStateShifterTypes<SessionSMConfig>;

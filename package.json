@@ -24,6 +24,7 @@
     "jest": "^30.3.0"
   },
   "dependencies": {
+    "state-shifter": "^1.0.0",
     "zod": "^4.4.3"
   }
 }

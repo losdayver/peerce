@@ -1,11 +1,11 @@
-import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
-import { SimplePeerStateMachineConfig } from "../stateMeta";
+import { SimplePeerStateShifterConfig } from "../stateMeta";
 import { SimplePeer } from "../simplePeer";
 import { getResolver } from "../../../utils/promiseUtils";
 import { logInfo } from "../../../utils/logUtils";
 import { TransceiverIPv4Params } from "../../../transport/transceiver";
+import { StateShifterBehaviorBase } from "state-shifter";
 
-export class ConnectingToRelay extends StateMachineBehaviorBase<SimplePeerStateMachineConfig> {
+export class ConnectingToRelay extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
   simplePeer: SimplePeer;
 
   constructor(simplePeer: SimplePeer) {
@@ -37,6 +37,6 @@ export class ConnectingToRelay extends StateMachineBehaviorBase<SimplePeerStateM
 
     transceiver.eventEmitter.removeListener("onConnected", listener);
 
-    await stateMachine.transitionTo("connectingToPeer");
+    await stateMachine.shiftTo("connectingToPeer");
   };
 }

@@ -1,8 +1,8 @@
-import { StateMachineBehaviorBase } from "../../../utils/stateMachine";
-import { SimplePeerStateMachineConfig } from "../stateMeta";
+import { SimplePeerStateShifterConfig } from "../stateMeta";
 import { SimplePeer } from "../simplePeer";
+import { StateShifterBehaviorBase } from "state-shifter";
 
-export class Closing extends StateMachineBehaviorBase<SimplePeerStateMachineConfig> {
+export class Closing extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
   simplePeer: SimplePeer;
 
   constructor(simplePeer: SimplePeer) {
