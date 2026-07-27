@@ -29,20 +29,23 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
   >();
 
   private addToChunkCollector = (chunk: PeerToPeerMessage) => {
-    const inner =
-      this.chunkCollector.get(chunk.fileName) ??
-      (this.chunkCollector.set(
-        chunk.fileName,
-        new Map<PeerToPeerMessage["chunkNo"], PeerToPeerMessage["payload"]>()
-      ),
-      this.chunkCollector.get(chunk.fileName)!);
+    let inner = this.chunkCollector.get(chunk.fileName);
+
+    if (!inner) {
+      inner = new Map<
+        PeerToPeerMessage["chunkNo"],
+        PeerToPeerMessage["payload"]
+      >();
+      this.chunkCollector.set(chunk.fileName, inner);
+      this.simplePeer.emit("onIncomingTransmissionStart", chunk.fileName);
+    }
 
     inner.set(chunk.chunkNo, chunk.payload);
 
-    logProgress(
-      `receiving "${chunk.fileName}"`,
-      inner.size / chunk.totalNo,
-      AnsiColor.BRIGHTMAGENTA
+    const progress = inner.size / chunk.totalNo;
+    this.simplePeer.emit(
+      "onIncomingTransmissionPercentageChange",
+      progress * 100
     );
 
     if (inner.size !== chunk.totalNo) return;
@@ -55,7 +58,7 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
         .map(([, payload]) => Buffer.from(payload, "base64"))
     );
 
-    this.simplePeer.eventEmitter.emit("onFullMessage", {
+    this.simplePeer.emit("onFullMessage", {
       fileName: chunk.fileName,
       buffer: fullBuffer,
     });
@@ -98,14 +101,11 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     );
     logInfo(`ready for data`);
 
-    this.simplePeer.eventEmitter.emit("onConnectedToPeer", sessionRequest);
+    this.simplePeer.emit("onConnectedToPeer", sessionRequest);
 
     transceiver.on("onReceive", this.onReceiveMsg);
   };
   onExit = () => {
-    this.simplePeer.transceiver.off(
-      "onReceive",
-      this.onReceiveMsg
-    );
+    this.simplePeer.transceiver.off("onReceive", this.onReceiveMsg);
   };
 }

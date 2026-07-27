@@ -41,8 +41,8 @@ const relay = new SimpleRelay(relayAddr.address, relayAddr.port, {
 
 test("Connection via relay", async () => {
   const promise = await Promise.all([
-    peer1.requestSessionViaRelay(),
-    peer2.requestSessionViaRelay(),
+    peer1.requestSessionViaRelayAsync(),
+    peer2.requestSessionViaRelayAsync(),
   ]);
   expect(promise).toBeTruthy();
 });
@@ -51,19 +51,32 @@ test("Lossy data transmission", async () => {
   const massivePayload = randomBytes(100000).toString();
 
   const testData = { fileName: "testPayload", payload: massivePayload };
+  const receivedFileNames: string[] = [];
+  const receivedPercentages: number[] = [];
+  const onPercentageChange = (percentage: number) => {
+    receivedPercentages.push(percentage);
+  };
   const dataPromise = once<{ buffer: Buffer; fileName: string }>(
-    peer2.eventEmitter,
+    peer2,
     "onFullMessage"
   );
+  peer2.once("onIncomingTransmissionStart", (fileName) => {
+    receivedFileNames.push(fileName);
+  });
+  peer2.on("onIncomingTransmissionPercentageChange", onPercentageChange);
   proxy1.lossPercentage = 0.5;
   peer1.sendData(testData);
 
   const data = await dataPromise;
 
+  peer2.off("onIncomingTransmissionPercentageChange", onPercentageChange);
+
   expect(
     data.buffer.toString() == testData.payload &&
       data.fileName == testData.fileName
   ).toBeTruthy();
+  expect(receivedFileNames).toEqual([testData.fileName]);
+  expect(receivedPercentages.at(-1)).toBe(100);
 
   proxy1.lossPercentage = 0;
 }, 10000);

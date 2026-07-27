@@ -6,11 +6,8 @@ import { TransceiverIPv4Params } from "../../../transport/transceiver";
 import { StateShifterBehaviorBase } from "state-shifter";
 
 export class ConnectingToRelay extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
-  simplePeer: SimplePeer;
-
-  constructor(simplePeer: SimplePeer) {
+  constructor(private simplePeer: SimplePeer) {
     super();
-    this.simplePeer = simplePeer;
   }
 
   onEnter = async () => {
@@ -32,6 +29,8 @@ export class ConnectingToRelay extends StateShifterBehaviorBase<SimplePeerStateS
     };
     transceiver.addListener("onConnected", listener);
     await connPromise;
+
+    this.simplePeer.emit("onConnectedToRelay");
 
     logInfo(`connected to relay ${relayAddr}:${relayPort}`);
 

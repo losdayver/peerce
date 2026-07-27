@@ -9,11 +9,8 @@ import { logInfo } from "../../../utils/logUtils";
 import { StateShifterBehaviorBase } from "state-shifter";
 
 export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
-  simplePeer: SimplePeer;
-
-  constructor(simplePeer: SimplePeer) {
+  constructor(private simplePeer: SimplePeer) {
     super();
-    this.simplePeer = simplePeer;
   }
 
   onEnter = async () => {
@@ -49,10 +46,7 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     );
 
     await peerRequestPromise;
-    transceiver.removeListener(
-      "onReceive",
-      sessionRequestListener
-    );
+    transceiver.removeListener("onReceive", sessionRequestListener);
 
     logInfo(`got session request from "${distantTag}"`);
     // Got session request object and trying to connect to peer
@@ -78,10 +72,9 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     transceiver.addListener("onConnected", peerConnectionListener);
     await connPromise;
 
-    transceiver.removeListener(
-      "onConnected",
-      peerConnectionListener
-    );
+    this.simplePeer.emit("onConnectedToPeer", sessionRequest!);
+
+    transceiver.removeListener("onConnected", peerConnectionListener);
 
     await stateMachine.shiftTo("connectedToPeer", sessionRequest!);
   };

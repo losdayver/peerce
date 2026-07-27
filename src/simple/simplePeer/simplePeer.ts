@@ -12,28 +12,31 @@ import {
   SimplePeerStateShifterBehaviors,
   simplePeerStateTransitionMap,
 } from "./stateMeta";
-import { ConnectingToRelay } from "./logic/connectingToRelay";
-import { ConnectingToPeer } from "./logic/connectingToPeer";
+import { EventEmitter } from "node:stream";
+import { StateShifter } from "state-shifter";
+import { ConnectingToRelay } from "./behaviors/connectingToRelay";
+import { ConnectingToPeer } from "./behaviors/connectingToPeer";
 import {
   ConnectedToPeer,
   ConnectedToPeerEventHandler,
-} from "./logic/connectedToPeer";
-import { EventEmitter } from "node:stream";
-import { Closing } from "./logic/closing";
-import { StateShifter } from "state-shifter";
+} from "./behaviors/connectedToPeer";
+import { Closing } from "./behaviors/closing";
 
 interface SimplePeerEventEmitterMap {
+  onConnectedToRelay: [];
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
+  onIncomingTransmissionStart: [fileName: string];
+  onIncomingTransmissionPercentageChange: [percentage: number];
   onFullMessage: [{ buffer: Buffer; fileName: string }];
 }
 
-export class SimplePeer {
+export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
   transceiver: TransceiverIPv4;
   stateMachine: SimplePeerStateShifter;
-  eventEmitter = new EventEmitter<SimplePeerEventEmitterMap>();
   initialParams: Required<SimpleProtocolPeerConfig>;
 
   constructor(initialParams: SimpleProtocolPeerConfig) {
+    super();
     this.transceiver = new TransceiverIPv4();
     this.stateMachine = new StateShifter<SimplePeerStateShifterConfig>(
       "idle",
@@ -50,9 +53,9 @@ export class SimplePeer {
     closing: new Closing(this),
   };
 
-  requestSessionViaRelay = async () => {
+  requestSessionViaRelayAsync = async () => {
     const sessionPromise = once<PeerToPeerSessionRequest>(
-      this.eventEmitter,
+      this,
       "onConnectedToPeer"
     );
     await this.stateMachine.shiftTo("connectingToRelay");
