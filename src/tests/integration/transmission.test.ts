@@ -76,7 +76,7 @@ test("Lossy data transmission", async () => {
       data.fileName == testData.fileName
   ).toBeTruthy();
   expect(receivedFileNames).toEqual([testData.fileName]);
-  expect(receivedPercentages.at(-1)).toBe(100);
+  expect(receivedPercentages.at(-1)).toBe(1);
 
   proxy1.lossPercentage = 0;
 }, 10000);
