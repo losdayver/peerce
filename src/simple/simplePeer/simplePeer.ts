@@ -26,7 +26,10 @@ interface SimplePeerEventEmitterMap {
   onConnectedToRelay: [];
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
   onIncomingTransmissionStart: [fileName: string];
-  onIncomingTransmissionPercentageChange: [percentage: number];
+  onIncomingTransmissionPercentageChange: [
+    fileName: string,
+    percentage: number,
+  ];
   onFullMessage: [{ buffer: Buffer; fileName: string }];
 }
 

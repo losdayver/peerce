@@ -1,6 +1,6 @@
 {
   "name": "peerce",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Simple UDP data transfer package based on NAT hole punching",
   "scripts": {
     "test": "npx tsc && jest",

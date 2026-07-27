@@ -45,7 +45,8 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     const progress = inner.size / chunk.totalNo;
     this.simplePeer.emit(
       "onIncomingTransmissionPercentageChange",
-      progress * 100
+      chunk.fileName,
+      progress
     );
 
     if (inner.size !== chunk.totalNo) return;

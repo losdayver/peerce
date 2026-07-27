@@ -53,7 +53,7 @@ test("Lossy data transmission", async () => {
   const testData = { fileName: "testPayload", payload: massivePayload };
   const receivedFileNames: string[] = [];
   const receivedPercentages: number[] = [];
-  const onPercentageChange = (percentage: number) => {
+  const onPercentageChange = (fileName: string, percentage: number) => {
     receivedPercentages.push(percentage);
   };
   const dataPromise = once<{ buffer: Buffer; fileName: string }>(
