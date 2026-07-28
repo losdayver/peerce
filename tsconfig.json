@@ -18,7 +18,9 @@
     "strictNullChecks": true,
     "noImplicitAny": false,
 
-    "noEmitOnError": true
+    "noEmitOnError": true,
+
+    "skipLibCheck": true
   },
   "include": ["src"]
 }
