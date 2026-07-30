@@ -353,6 +353,12 @@ export class TransceiverIPv4 extends EventEmitter<TransceiverEventMap> {
     if (session) await session.closeAsync();
   }
 
+  public canSend(address: string, port: number) {
+    return (
+      this.sessionMap.get(`${address}:${port}`)?.isConnected() === true
+    );
+  }
+
   public close(): Promise<void> {
     this.closePromise ??= this.performClose();
     return this.closePromise;

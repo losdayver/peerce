@@ -30,6 +30,8 @@ export class Session extends EventEmitter<SessionEventMap> {
   stateMachine: SessionSMTypes["StateShifter"];
   private closePromise: Promise<void> | undefined;
 
+  isConnected = () => this.stateMachine.getCurrentState() === "connected";
+
   private sessionStateBehaviors: SessionSMTypes["Behaviors"] = {
     connecting: new ConnectingBehavior(this),
     connected: new ConnectedBehavior(this),
