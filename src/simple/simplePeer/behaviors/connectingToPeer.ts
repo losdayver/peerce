@@ -23,18 +23,24 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     let sessionRequest: PeerToPeerSessionRequest;
     let { promise: peerRequestPromise, resolver: peerRequestResolver } =
       getResolver();
-    const sessionRequestListener = (addrObj, msg) => {
+    const sessionRequestListener = (
+      addrObj: { address: string; port: number },
+      msg: Buffer
+    ) => {
       if (addrObj.address == relayAddr && addrObj.port == relayPort) {
-        // todo check msg for correct schema
-        sessionRequest = JSON.parse(msg) as PeerToPeerSessionRequest;
-
-        // Ignore messages that have wrong distantTag
-        if (sessionRequest.distantTag !== distantTag) return;
-
-        peerRequestResolver.resolve?.();
+        try {
+          sessionRequest = JSON.parse(
+            msg.toString()
+          ) as PeerToPeerSessionRequest;
+          // todo schema check json
+          if (sessionRequest.distantTag !== distantTag) return;
+          peerRequestResolver.resolve?.();
+        } catch (e) {
+          console.error(e);
+        }
       }
     };
-    transceiver.addListener("onReceive", sessionRequestListener);
+    transceiver.once("onReceive", sessionRequestListener);
 
     transceiver.send(
       relayAddr,
@@ -45,8 +51,16 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
       } satisfies PeerToRelaySessionRequest)
     );
 
-    await peerRequestPromise;
-    transceiver.removeListener("onReceive", sessionRequestListener);
+    let value = await Promise.race([
+      peerRequestPromise,
+      this.simplePeer.__prematureClosePromise,
+    ]);
+
+    if (value == "PREMATURE_CLOSE") {
+      this.simplePeer.emit("onClosing", "SELF_CLOSE");
+      await this.simplePeer.stateMachine.shiftTo("closing");
+      return;
+    }
 
     logInfo(`got session request from "${distantTag}"`);
     // Got session request object and trying to connect to peer
@@ -69,12 +83,19 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
       )
         connResolver.resolve?.();
     };
-    transceiver.addListener("onConnected", peerConnectionListener);
-    await connPromise;
+    transceiver.once("onConnected", peerConnectionListener);
+
+    value = await Promise.race([
+      connPromise,
+      this.simplePeer.__prematureClosePromise,
+    ]);
+    if (value == "PREMATURE_CLOSE") {
+      this.simplePeer.emit("onClosing", "SELF_CLOSE");
+      await this.simplePeer.stateMachine.shiftTo("closing");
+      return;
+    }
 
     this.simplePeer.emit("onConnectedToPeer", sessionRequest!);
-
-    transceiver.removeListener("onConnected", peerConnectionListener);
 
     await stateMachine.shiftTo("connectedToPeer", sessionRequest!);
   };

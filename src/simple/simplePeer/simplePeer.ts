@@ -22,6 +22,12 @@ import {
 } from "./behaviors/connectedToPeer";
 import { Closing } from "./behaviors/closing";
 
+export type ClosingReason =
+  | "RELAY_UNAVAILABLE"
+  | "RELAY_CLOSE"
+  | "DISTANT_CLOSE"
+  | "SELF_CLOSE";
+
 interface SimplePeerEventEmitterMap {
   onConnectedToRelay: [];
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
@@ -31,15 +37,22 @@ interface SimplePeerEventEmitterMap {
     percentage: number,
   ];
   onFullMessage: [{ buffer: Buffer; fileName: string }];
+  onClosing: [reason: ClosingReason];
 }
 
 export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
   transceiver: TransceiverIPv4;
   stateMachine: SimplePeerStateShifter;
   initialParams: Required<SimpleProtocolPeerConfig>;
+  public __prematureClosePromise: Promise<"PREMATURE_CLOSE">;
+  public __prematureCloseCallback: () => void;
 
   constructor(initialParams: SimpleProtocolPeerConfig) {
     super();
+    this.__prematureCloseCallback = null as any;
+    this.__prematureClosePromise = new Promise((res) => {
+      this.__prematureCloseCallback = () => res("PREMATURE_CLOSE");
+    });
     this.transceiver = new TransceiverIPv4();
     this.stateMachine = new StateShifter<SimplePeerStateShifterConfig>(
       "idle",
@@ -65,7 +78,10 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
     return await sessionPromise;
   };
 
-  sendData = ({ fileName, payload }: PeerToPeerMessageDescriptor) => {
+  createOutgoingTransmission = ({
+    fileName,
+    payload,
+  }: PeerToPeerMessageDescriptor) => {
     if (this.stateMachine.getCurrentState() !== "connectedToPeer")
       throw new Error(
         `Cannot send data on ${this.stateMachine.getCurrentState()}`
@@ -77,6 +93,8 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
   };
 
   close = () => {
-    void this.stateMachine.shiftTo("closing");
+    this.__prematureCloseCallback();
+    if (this.stateMachine.getCurrentState() != "closing")
+      void this.stateMachine.shiftTo("closing");
   };
 }

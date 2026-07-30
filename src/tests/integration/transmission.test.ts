@@ -65,7 +65,7 @@ test("Lossy data transmission", async () => {
   });
   peer2.on("onIncomingTransmissionPercentageChange", onPercentageChange);
   proxy1.lossPercentage = 0.5;
-  peer1.sendData(testData);
+  peer1.createOutgoingTransmission(testData);
 
   const data = await dataPromise;
 

@@ -3,11 +3,8 @@ import { SimplePeer } from "../simplePeer";
 import { StateShifterBehaviorBase } from "state-shifter";
 
 export class Closing extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
-  simplePeer: SimplePeer;
-
-  constructor(simplePeer: SimplePeer) {
+  constructor(private simplePeer: SimplePeer) {
     super();
-    this.simplePeer = simplePeer;
   }
 
   onEnter = async () => {

@@ -14,27 +14,35 @@ export class ConnectingToRelay extends StateShifterBehaviorBase<SimplePeerStateS
     const { initialParams, transceiver, stateMachine } = this.simplePeer;
     const { relayAddr, relayPort, selfAddr, selfPort } = initialParams;
 
-    logInfo("firing socket");
-
     let selfObj: TransceiverIPv4Params["self"] | undefined = undefined;
     if (selfAddr && selfPort) selfObj = { address: selfAddr, port: selfPort };
     await transceiver.listen(selfObj);
 
-    logInfo(`connecting to relay ${relayAddr}:${relayPort}`);
-    transceiver.connect(relayAddr, relayPort);
-
+    let isConnected = false;
     let { promise: connPromise, resolver: connResolver } = getResolver();
-    const listener = (address: string, port: number) => {
+    const connectedListener = (address: string, port: number) => {
+      isConnected = true;
       if (address == relayAddr && relayPort == port) connResolver.resolve?.();
     };
-    transceiver.addListener("onConnected", listener);
+    const disconnectedListener = (address: string, port: number) => {
+      if (address == relayAddr && relayPort == port) connResolver.resolve?.();
+    };
+    transceiver.once("onConnected", connectedListener);
+    transceiver.once("onSessionClosed", disconnectedListener);
+
+    logInfo(`connecting to relay ${relayAddr}:${relayPort}`);
+    transceiver.connect(relayAddr, relayPort);
     await connPromise;
+
+    if (!isConnected) {
+      this.simplePeer.emit("onClosing", "RELAY_UNAVAILABLE");
+      void stateMachine.shiftTo("closing");
+      return;
+    }
 
     this.simplePeer.emit("onConnectedToRelay");
 
     logInfo(`connected to relay ${relayAddr}:${relayPort}`);
-
-    transceiver.removeListener("onConnected", listener);
 
     await stateMachine.shiftTo("connectingToPeer");
   };

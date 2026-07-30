@@ -6,8 +6,8 @@ import {
 
 export const simplePeerStateTransitionMap = {
   idle: ["connectingToRelay", "error"] as const,
-  connectingToRelay: ["connectingToPeer", "error"] as const,
-  connectingToPeer: ["connectedToPeer", "error"] as const,
+  connectingToRelay: ["connectingToPeer", "closing", "error"] as const,
+  connectingToPeer: ["connectedToPeer", "closing", "error"] as const,
   connectedToPeer: ["closing", "error"] as const,
   closing: ["closed", "error"] as const,
   closed: [] as const,

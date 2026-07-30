@@ -20,7 +20,7 @@ void (async () => {
   });
   await simplePeer.requestSessionViaRelayAsync();
   if (envConfig.payload)
-    simplePeer.sendData({
+    simplePeer.createOutgoingTransmission({
       payload: envConfig.payload,
       fileName: envConfig.fromFile ? basename(envConfig.fromFile) : undefined,
     });

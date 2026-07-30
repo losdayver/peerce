@@ -108,5 +108,7 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
   };
   onExit = () => {
     this.simplePeer.transceiver.off("onReceive", this.onReceiveMsg);
+    this.chunkCollector.clear();
+    this.sessionRequest = undefined;
   };
 }
