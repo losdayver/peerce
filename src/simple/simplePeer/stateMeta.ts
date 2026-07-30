@@ -5,7 +5,7 @@ import {
 } from "state-shifter";
 
 export const simplePeerStateTransitionMap = {
-  idle: ["connectingToRelay", "error"] as const,
+  idle: ["connectingToRelay", "closing", "error"] as const,
   connectingToRelay: ["connectingToPeer", "closing", "error"] as const,
   connectingToPeer: ["connectedToPeer", "closing", "error"] as const,
   connectedToPeer: ["closing", "error"] as const,

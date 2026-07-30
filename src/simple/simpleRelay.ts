@@ -16,12 +16,16 @@ export abstract class PeerProxy {
     ownPeer: { address: string; port: number },
     distantPeer: { address: string; port: number }
   ) => void | Promise<void>;
+
+  abstract close: () => Promise<void>;
 }
 
 type TagProxyMap = Record<string, PeerProxy>;
 
 export class SimpleRelay {
   transceiver: TransceiverIPv4;
+  private readonly listenPromise: Promise<void>;
+  private closePromise: Promise<void> | undefined;
 
   private requestMap = new Map<
     `${PeerToRelaySessionRequest["selfTag"]}:${PeerToRelaySessionRequest["distantTag"]}`,
@@ -34,11 +38,30 @@ export class SimpleRelay {
     private tagProxyMap?: TagProxyMap
   ) {
     this.transceiver = new TransceiverIPv4();
-    void this.transceiver.listen({ address, port });
+    this.listenPromise = this.transceiver.listen({ address, port });
+    void this.listenPromise.catch(() => undefined);
 
     this.transceiver.on("onReceive", this.onReceiveFromPeer);
     this.transceiver.on("onSessionClosed", this.onSessionClosed);
   }
+
+  ready = () => this.listenPromise;
+
+  close = (): Promise<void> => {
+    this.closePromise ??= this.performClose();
+    return this.closePromise;
+  };
+
+  private performClose = async () => {
+    this.transceiver.off("onReceive", this.onReceiveFromPeer);
+    this.transceiver.off("onSessionClosed", this.onSessionClosed);
+
+    try {
+      await this.transceiver.close();
+    } finally {
+      this.requestMap.clear();
+    }
+  };
 
   onSessionClosed = (address: string, port: number) => {
     for (const [key, peer] of this.requestMap.entries()) {

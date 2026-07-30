@@ -95,6 +95,20 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     this.addToChunkCollector(JSON.parse(msg.toString()));
   };
 
+  private onPeerSessionClosed = (address: string, port: number) => {
+    const sessionRequest = this.sessionRequest;
+    if (
+      !sessionRequest ||
+      address !== sessionRequest.distantAddress ||
+      port !== sessionRequest.distantPort ||
+      this.simplePeer.stateMachine.getCurrentState() !== "connectedToPeer"
+    )
+      return;
+
+    this.simplePeer.emit("onClosing", "DISTANT_CLOSE");
+    void this.simplePeer.stateMachine.shiftTo("closing");
+  };
+
   onEnter = (_, sessionRequest: PeerToPeerSessionRequest) => {
     const { transceiver } = this.simplePeer;
     this.sessionRequest = sessionRequest;
@@ -108,10 +122,15 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     this.simplePeer.emit("onConnectedToPeer", sessionRequest);
 
     transceiver.on("onReceive", this.onReceiveMsg);
+    transceiver.on("onSessionClosed", this.onPeerSessionClosed);
   };
   onExit = () => {
     this.isActive = false;
     this.simplePeer.transceiver.off("onReceive", this.onReceiveMsg);
+    this.simplePeer.transceiver.off(
+      "onSessionClosed",
+      this.onPeerSessionClosed
+    );
     this.chunkCollector.clear();
     this.sessionRequest = undefined;
   };

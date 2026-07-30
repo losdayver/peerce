@@ -39,7 +39,26 @@ const relay = new SimpleRelay(relayAddr.address, relayAddr.port, {
   peer2: proxy2,
 });
 
+afterAll(async () => {
+  const peerResults = await Promise.allSettled([
+    peer1.close(),
+    peer2.close(),
+  ]);
+  const infrastructureResults = await Promise.allSettled([
+    relay.close(),
+    proxy1.close(),
+    proxy2.close(),
+  ]);
+  const failedResult = [...peerResults, ...infrastructureResults].find(
+    (result) => result.status === "rejected"
+  );
+
+  if (failedResult?.status === "rejected") throw failedResult.reason;
+});
+
 test("Connection via relay", async () => {
+  await relay.ready();
+
   const promise = await Promise.all([
     peer1.requestSessionViaRelayAsync(),
     peer2.requestSessionViaRelayAsync(),

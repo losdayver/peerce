@@ -46,6 +46,7 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
   initialParams: Required<SimpleProtocolPeerConfig>;
   public __prematureClosePromise: Promise<"PREMATURE_CLOSE">;
   public __prematureCloseCallback: () => void;
+  private closePromise: Promise<void> | undefined;
 
   constructor(initialParams: SimpleProtocolPeerConfig) {
     super();
@@ -92,12 +93,29 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
     });
   };
 
-  close = () => {
+  close = (): Promise<void> => {
+    if (this.closePromise) return this.closePromise;
+
     const state = this.stateMachine.getCurrentState();
-    if (state === "closing" || state === "closed" || state === "error") return;
+    if (state === "closed" || state === "error") return Promise.resolve();
+    if (state === "closing") {
+      this.closePromise = this.transceiver.close();
+      return this.closePromise;
+    }
+
+    let resolveClose: (() => void) | undefined;
+    let rejectClose: ((reason?: unknown) => void) | undefined;
+    this.closePromise = new Promise<void>((resolve, reject) => {
+      resolveClose = resolve;
+      rejectClose = reject;
+    });
 
     this.__prematureCloseCallback();
     this.emit("onClosing", "SELF_CLOSE");
-    void this.stateMachine.shiftTo("closing");
+    void this.stateMachine
+      .shiftTo("closing")
+      .then(resolveClose, rejectClose);
+
+    return this.closePromise;
   };
 }
