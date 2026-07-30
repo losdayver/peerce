@@ -249,7 +249,8 @@ class Transmission {
       for (
         let i = this.greatestSequentialAckNum + 1;
         !this.isStopped &&
-        i < Math.min(this.greatestSequentialAckNum + 20, this.constructed!.total);
+        i <
+          Math.min(this.greatestSequentialAckNum + 20, this.constructed!.total);
         i++
       ) {
         const hasAck = this.dataAckMap.get(i);
@@ -290,8 +291,9 @@ class Transmission {
   collectDataAck = (message: DataAckMessage) => {
     if (this.isStopped) return;
     this.dataAckMap.set(message.ack, message);
-    if (message.ack == this.greatestSequentialAckNum + 1)
-      this.greatestSequentialAckNum = message.ack;
+    while (this.dataAckMap.has(this.greatestSequentialAckNum + 1)) {
+      this.greatestSequentialAckNum += 1;
+    }
 
     if (this.greatestSequentialAckNum + 1 == this.constructed?.buffers.length) {
       this.isTransmissionFin = true;

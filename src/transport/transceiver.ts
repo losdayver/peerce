@@ -354,9 +354,7 @@ export class TransceiverIPv4 extends EventEmitter<TransceiverEventMap> {
   }
 
   public canSend(address: string, port: number) {
-    return (
-      this.sessionMap.get(`${address}:${port}`)?.isConnected() === true
-    );
+    return this.sessionMap.get(`${address}:${port}`)?.isConnected() === true;
   }
 
   public close(): Promise<void> {
@@ -378,7 +376,15 @@ export class TransceiverIPv4 extends EventEmitter<TransceiverEventMap> {
       throw new Error(`Cannot send datagram while transceiver is ${state}`);
 
     socket.send(msg, port, address, (error) => {
-      if (error) this.onSocketError(error);
+      if (!error) return;
+
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOBUFS" || code === "EAGAIN") {
+        this.emit("onError", error);
+        return;
+      }
+
+      this.onSocketError(error);
     });
   }
 }
