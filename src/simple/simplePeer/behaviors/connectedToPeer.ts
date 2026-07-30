@@ -27,6 +27,7 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     PeerToPeerMessage["fileName"],
     Map<PeerToPeerMessage["chunkNo"], PeerToPeerMessage["payload"]>
   >();
+  private isActive = false;
 
   private addToChunkCollector = (chunk: PeerToPeerMessage) => {
     let inner = this.chunkCollector.get(chunk.fileName);
@@ -73,6 +74,7 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     const messages = chunkPeerToPeerMessages(params);
     for (const msg of messages) {
       await sleep(1); // todo wtf?
+      if (!this.isActive) return;
       transceiver.send(distantAddress, distantPort, msg);
     }
   };
@@ -96,6 +98,7 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
   onEnter = (_, sessionRequest: PeerToPeerSessionRequest) => {
     const { transceiver } = this.simplePeer;
     this.sessionRequest = sessionRequest;
+    this.isActive = true;
 
     logInfo(
       `connected to peer ${sessionRequest.distantAddress}:${sessionRequest.distantPort}`
@@ -107,6 +110,7 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     transceiver.on("onReceive", this.onReceiveMsg);
   };
   onExit = () => {
+    this.isActive = false;
     this.simplePeer.transceiver.off("onReceive", this.onReceiveMsg);
     this.chunkCollector.clear();
     this.sessionRequest = undefined;

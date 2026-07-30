@@ -57,8 +57,6 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     ]);
 
     if (value == "PREMATURE_CLOSE") {
-      this.simplePeer.emit("onClosing", "SELF_CLOSE");
-      await this.simplePeer.stateMachine.shiftTo("closing");
       return;
     }
 
@@ -90,8 +88,6 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
       this.simplePeer.__prematureClosePromise,
     ]);
     if (value == "PREMATURE_CLOSE") {
-      this.simplePeer.emit("onClosing", "SELF_CLOSE");
-      await this.simplePeer.stateMachine.shiftTo("closing");
       return;
     }
 

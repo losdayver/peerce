@@ -5,11 +5,11 @@ import { SimplePeer } from "../../simple/simplePeer/simplePeer";
 import { SimpleRelay } from "../../simple/simpleRelay";
 
 const localhost = "127.0.0.1";
-const relayAddr = { address: localhost, port: 5656 };
-const peer1Addr = { address: localhost, port: 5657 };
-const peer2Addr = { address: localhost, port: 5658 };
-const proxy1Addr = { address: localhost, port: 5659 };
-const proxy2Addr = { address: localhost, port: 5660 };
+const relayAddr = { address: localhost, port: 50656 };
+const peer1Addr = { address: localhost, port: 50657 };
+const peer2Addr = { address: localhost, port: 50658 };
+const proxy1Addr = { address: localhost, port: 50659 };
+const proxy2Addr = { address: localhost, port: 50660 };
 
 // todo fix proxies
 

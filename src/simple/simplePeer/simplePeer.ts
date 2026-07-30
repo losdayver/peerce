@@ -93,8 +93,11 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
   };
 
   close = () => {
+    const state = this.stateMachine.getCurrentState();
+    if (state === "closing" || state === "closed" || state === "error") return;
+
     this.__prematureCloseCallback();
-    if (this.stateMachine.getCurrentState() != "closing")
-      void this.stateMachine.shiftTo("closing");
+    this.emit("onClosing", "SELF_CLOSE");
+    void this.stateMachine.shiftTo("closing");
   };
 }
