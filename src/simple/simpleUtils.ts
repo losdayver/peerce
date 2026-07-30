@@ -9,7 +9,7 @@ export const chunkPeerToPeerMessages = ({
   payload: Buffer | string;
   fileName?: string;
   chunkLength?: number;
-}): Buffer[] => {
+}): { fileName: string; messages: Buffer[] } => {
   const payloadBuf = Buffer.isBuffer(payload)
     ? payload
     : Buffer.from(payload, "utf8");
@@ -37,5 +37,5 @@ export const chunkPeerToPeerMessages = ({
     out.push(Buffer.from(JSON.stringify(msg)));
   }
 
-  return out;
+  return { fileName: generatedFileName, messages: out };
 };

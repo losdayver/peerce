@@ -36,6 +36,10 @@ interface SimplePeerEventEmitterMap {
     fileName: string,
     percentage: number,
   ];
+  onOutgoingTransmissionPercentageChange: [
+    fileName: string,
+    percentage: number,
+  ];
   onFullMessage: [{ buffer: Buffer; fileName: string }];
   onClosing: [reason: ClosingReason];
 }

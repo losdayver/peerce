@@ -71,8 +71,8 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     const { transceiver } = this.simplePeer;
     const { distantAddress, distantPort } = this.sessionRequest!;
     logInfo(`sending "${params.fileName}"`);
-    const messages = chunkPeerToPeerMessages(params);
-    for (const msg of messages) {
+    const { fileName, messages } = chunkPeerToPeerMessages(params);
+    for (const [index, msg] of messages.entries()) {
       await sleep(1); // todo wtf?
       if (
         !this.isActive ||
@@ -80,6 +80,11 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
       )
         return;
       transceiver.send(distantAddress, distantPort, msg);
+      this.simplePeer.emit(
+        "onOutgoingTransmissionPercentageChange",
+        fileName,
+        (index + 1) / messages.length
+      );
     }
   };
 

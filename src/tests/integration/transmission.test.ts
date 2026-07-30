@@ -72,8 +72,17 @@ test("Lossy data transmission", async () => {
   const testData = { fileName: "testPayload", payload: massivePayload };
   const receivedFileNames: string[] = [];
   const receivedPercentages: number[] = [];
+  const outgoingFileNames: string[] = [];
+  const outgoingPercentages: number[] = [];
   const onPercentageChange = (fileName: string, percentage: number) => {
     receivedPercentages.push(percentage);
+  };
+  const onOutgoingPercentageChange = (
+    fileName: string,
+    percentage: number
+  ) => {
+    outgoingFileNames.push(fileName);
+    outgoingPercentages.push(percentage);
   };
   const dataPromise = once<{ buffer: Buffer; fileName: string }>(
     peer2,
@@ -83,12 +92,20 @@ test("Lossy data transmission", async () => {
     receivedFileNames.push(fileName);
   });
   peer2.on("onIncomingTransmissionPercentageChange", onPercentageChange);
+  peer1.on(
+    "onOutgoingTransmissionPercentageChange",
+    onOutgoingPercentageChange
+  );
   proxy1.lossPercentage = 0.5;
   peer1.createOutgoingTransmission(testData);
 
   const data = await dataPromise;
 
   peer2.off("onIncomingTransmissionPercentageChange", onPercentageChange);
+  peer1.off(
+    "onOutgoingTransmissionPercentageChange",
+    onOutgoingPercentageChange
+  );
 
   expect(
     data.buffer.toString() == testData.payload &&
@@ -96,6 +113,9 @@ test("Lossy data transmission", async () => {
   ).toBeTruthy();
   expect(receivedFileNames).toEqual([testData.fileName]);
   expect(receivedPercentages.at(-1)).toBe(1);
+  expect(outgoingFileNames.every((fileName) => fileName === testData.fileName))
+    .toBeTruthy();
+  expect(outgoingPercentages.at(-1)).toBe(1);
 
   proxy1.lossPercentage = 0;
 }, 10000);
