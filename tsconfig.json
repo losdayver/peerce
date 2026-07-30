@@ -12,6 +12,10 @@
     "types": ["node", "jest"],
     "typeRoots": ["./node_modules/@types"],
 
+    "declaration": true,
+    "declarationMap": true,
+    "declarationDir": "types",
+
     "esModuleInterop": true,
     "resolveJsonModule": true,
 
