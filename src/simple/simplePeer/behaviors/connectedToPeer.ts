@@ -73,11 +73,8 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     logInfo(`sending "${params.fileName}"`);
     const { fileName, messages } = chunkPeerToPeerMessages(params);
     for (const [index, msg] of messages.entries()) {
-      await sleep(1); // todo wtf?
-      if (
-        !this.isActive ||
-        !transceiver.canSend(distantAddress, distantPort)
-      )
+      await sleep(10);
+      if (!this.isActive || !transceiver.canSend(distantAddress, distantPort))
         return;
       transceiver.send(distantAddress, distantPort, msg);
       this.simplePeer.emit(
