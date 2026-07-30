@@ -1,10 +1,70 @@
-import * as z from "zod";
 import { TransceiverIPv4 } from "../transport/transceiver";
 import {
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
 } from "./simpleProtocol";
-import { AnsiColor, colorLog, logInfo } from "../utils/logUtils";
+import {
+  AnsiColor,
+  colorLog,
+  logError,
+  logInfo,
+  logWarning,
+} from "../utils/logUtils";
+
+const MAX_REQUEST_BYTES = 1_024;
+const MAX_TAG_LENGTH = 128;
+const MAX_PENDING_REQUESTS = 10_000;
+const PENDING_REQUEST_TTL_MS = 30_000;
+const REQUEST_CLEANUP_INTERVAL_MS = 5_000;
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
+
+interface PeerAddress {
+  readonly address: string;
+  readonly port: number;
+}
+
+interface PendingSessionRequest extends PeerAddress {
+  readonly createdAt: number;
+}
+
+const createRequestKey = (selfTag: string, distantTag: string) =>
+  JSON.stringify([selfTag, distantTag]);
+
+const isValidTag = (value: unknown): value is string =>
+  typeof value === "string" &&
+  value.trim().length > 0 &&
+  value.length <= MAX_TAG_LENGTH &&
+  !CONTROL_CHARACTER_PATTERN.test(value);
+
+const parseSessionRequest = (
+  message: Buffer
+): PeerToRelaySessionRequest | undefined => {
+  if (message.length === 0 || message.length > MAX_REQUEST_BYTES)
+    return undefined;
+
+  let value: unknown;
+  try {
+    value = JSON.parse(message.toString("utf8"));
+  } catch {
+    return undefined;
+  }
+
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return undefined;
+
+  const candidate = value as Record<string, unknown>;
+  if (
+    !isValidTag(candidate.selfTag) ||
+    !isValidTag(candidate.distantTag) ||
+    candidate.selfTag === candidate.distantTag
+  )
+    return undefined;
+
+  return {
+    selfTag: candidate.selfTag,
+    distantTag: candidate.distantTag,
+  };
+};
 
 export abstract class PeerProxy {
   constructor(
@@ -13,8 +73,8 @@ export abstract class PeerProxy {
   ) {}
 
   abstract setup: (
-    ownPeer: { address: string; port: number },
-    distantPeer: { address: string; port: number }
+    ownPeer: PeerAddress,
+    distantPeer: PeerAddress
   ) => void | Promise<void>;
 
   abstract close: () => Promise<void>;
@@ -25,12 +85,10 @@ type TagProxyMap = Record<string, PeerProxy>;
 export class SimpleRelay {
   transceiver: TransceiverIPv4;
   private readonly listenPromise: Promise<void>;
+  private readonly requestCleanupInterval: NodeJS.Timeout;
   private closePromise: Promise<void> | undefined;
 
-  private requestMap = new Map<
-    `${PeerToRelaySessionRequest["selfTag"]}:${PeerToRelaySessionRequest["distantTag"]}`,
-    { address: string; port: number }
-  >();
+  private readonly requestMap = new Map<string, PendingSessionRequest>();
 
   constructor(
     address: string,
@@ -43,6 +101,12 @@ export class SimpleRelay {
 
     this.transceiver.on("onReceive", this.onReceiveFromPeer);
     this.transceiver.on("onSessionClosed", this.onSessionClosed);
+
+    this.requestCleanupInterval = setInterval(
+      this.removeExpiredRequests,
+      REQUEST_CLEANUP_INTERVAL_MS
+    );
+    this.requestCleanupInterval.unref();
   }
 
   ready = () => this.listenPromise;
@@ -53,6 +117,7 @@ export class SimpleRelay {
   };
 
   private performClose = async () => {
+    clearInterval(this.requestCleanupInterval);
     this.transceiver.off("onReceive", this.onReceiveFromPeer);
     this.transceiver.off("onSessionClosed", this.onSessionClosed);
 
@@ -63,72 +128,115 @@ export class SimpleRelay {
     }
   };
 
-  onSessionClosed = (address: string, port: number) => {
-    for (const [key, peer] of this.requestMap.entries()) {
-      if (peer.address === address && peer.port === port) {
-        this.requestMap.delete(key);
-      }
+  private removeExpiredRequests = () => {
+    const expiresBefore = Date.now() - PENDING_REQUEST_TTL_MS;
+
+    for (const [key, request] of this.requestMap) {
+      if (request.createdAt <= expiresBefore) this.requestMap.delete(key);
     }
   };
 
-  onReceiveFromPeer = async (
-    addrObj: { address: string; port: number },
-    msg: Buffer
-  ) => {
-    const obj = JSON.parse(msg.toString()) as PeerToRelaySessionRequest;
-
-    // todo zod or something
-    this.requestMap.set(`${obj.selfTag}:${obj.distantTag}`, { ...addrObj });
-
-    logInfo(`requesting ${obj.selfTag}:${obj.distantTag}`);
-
-    const peerRequest = this.requestMap.get(`${obj.distantTag}:${obj.selfTag}`);
-
-    if (peerRequest) {
-      let proxy1: PeerProxy | undefined;
-      let proxy2: PeerProxy | undefined;
-      if (this.tagProxyMap) proxy1 = this.tagProxyMap[obj.selfTag];
-      if (this.tagProxyMap) proxy2 = this.tagProxyMap[obj.distantTag];
-
-      if (proxy1)
-        await proxy1.setup(
-          { address: addrObj.address, port: addrObj.port },
-          {
-            address: proxy2 ? proxy2.address : peerRequest.address,
-            port: proxy2 ? proxy2.port : peerRequest.port,
-          }
-        );
-      if (proxy2)
-        await proxy2.setup(
-          { address: peerRequest.address, port: peerRequest.port },
-          {
-            address: proxy1 ? proxy1.address : addrObj.address,
-            port: proxy1 ? proxy1.port : addrObj.port,
-          }
-        );
-
-      colorLog(
-        `request satisfied ${obj.selfTag}:${obj.distantTag}`,
-        AnsiColor.BRIGHTGREEN
-      );
-      this.transceiver.send(
-        peerRequest.address,
-        peerRequest.port,
-        JSON.stringify({
-          distantTag: obj.selfTag,
-          distantAddress: proxy2 ? proxy2.address : addrObj.address,
-          distantPort: proxy2 ? proxy2.port : addrObj.port,
-        } satisfies PeerToPeerSessionRequest)
-      );
-      this.transceiver.send(
-        addrObj.address,
-        addrObj.port,
-        JSON.stringify({
-          distantTag: obj.distantTag,
-          distantAddress: proxy1 ? proxy1.address : peerRequest.address,
-          distantPort: proxy1 ? proxy1.port : peerRequest.port,
-        } satisfies PeerToPeerSessionRequest)
-      );
+  onSessionClosed = (address: string, port: number) => {
+    for (const [key, peer] of this.requestMap.entries()) {
+      if (peer.address === address && peer.port === port)
+        this.requestMap.delete(key);
     }
+  };
+
+  onReceiveFromPeer = (peerAddress: PeerAddress, message: Buffer) => {
+    const request = parseSessionRequest(message);
+    if (!request) {
+      logWarning(
+        `ignored invalid relay request from ${peerAddress.address}:${peerAddress.port}`
+      );
+      return;
+    }
+
+    void this.processSessionRequest(peerAddress, request).catch((cause) => {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      logError(`failed to process relay request: ${message}`);
+    });
+  };
+
+  private processSessionRequest = async (
+    peerAddress: PeerAddress,
+    request: PeerToRelaySessionRequest
+  ) => {
+    const requestKey = createRequestKey(request.selfTag, request.distantTag);
+    const reverseRequestKey = createRequestKey(
+      request.distantTag,
+      request.selfTag
+    );
+    const now = Date.now();
+    let distantPeer = this.requestMap.get(reverseRequestKey);
+
+    if (
+      distantPeer &&
+      distantPeer.createdAt <= now - PENDING_REQUEST_TTL_MS
+    ) {
+      this.requestMap.delete(reverseRequestKey);
+      distantPeer = undefined;
+    }
+
+    if (!distantPeer) {
+      if (
+        !this.requestMap.has(requestKey) &&
+        this.requestMap.size >= MAX_PENDING_REQUESTS
+      ) {
+        logWarning("relay pending request limit reached");
+        return;
+      }
+
+      this.requestMap.set(requestKey, {
+        ...peerAddress,
+        createdAt: now,
+      });
+      logInfo(`requesting ${request.selfTag}:${request.distantTag}`);
+      return;
+    }
+
+    this.requestMap.delete(reverseRequestKey);
+    this.requestMap.delete(requestKey);
+
+    const selfProxy = this.tagProxyMap?.[request.selfTag];
+    const distantProxy = this.tagProxyMap?.[request.distantTag];
+
+    if (selfProxy)
+      await selfProxy.setup(peerAddress, {
+        address: distantProxy ? distantProxy.address : distantPeer.address,
+        port: distantProxy ? distantProxy.port : distantPeer.port,
+      });
+    if (distantProxy)
+      await distantProxy.setup(distantPeer, {
+        address: selfProxy ? selfProxy.address : peerAddress.address,
+        port: selfProxy ? selfProxy.port : peerAddress.port,
+      });
+
+    colorLog(
+      `request satisfied ${request.selfTag}:${request.distantTag}`,
+      AnsiColor.BRIGHTGREEN
+    );
+    this.transceiver.send(
+      distantPeer.address,
+      distantPeer.port,
+      JSON.stringify({
+        distantTag: request.selfTag,
+        distantAddress: distantProxy
+          ? distantProxy.address
+          : peerAddress.address,
+        distantPort: distantProxy ? distantProxy.port : peerAddress.port,
+      } satisfies PeerToPeerSessionRequest)
+    );
+    this.transceiver.send(
+      peerAddress.address,
+      peerAddress.port,
+      JSON.stringify({
+        distantTag: request.distantTag,
+        distantAddress: selfProxy
+          ? selfProxy.address
+          : distantPeer.address,
+        distantPort: selfProxy ? selfProxy.port : distantPeer.port,
+      } satisfies PeerToPeerSessionRequest)
+    );
   };
 }
