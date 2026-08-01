@@ -160,6 +160,7 @@ export class ConnectedBehavior extends StateShifterBehaviorBase<
       switch (payload.type) {
         case MessageType.KEEP_ALIVE:
           this.lastKeepAliveReceivedDate = new Date();
+          break;
         case MessageType.DATA:
           if (this.isValidDataMessage(payload))
             this.collectDataMessagePart(payload);
