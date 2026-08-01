@@ -41,6 +41,7 @@ export class ConnectedBehavior extends StateShifterBehaviorBase<
 
   private dataSender = new DataSender(this);
   private keepAliveNumSeconds = 5;
+  private keepAliveTimeOutSeconds = 20;
   private keepAliveInterval: NodeJS.Timeout | undefined;
   private collectorCleanupInterval: NodeJS.Timeout | undefined;
   private lastKeepAliveReceivedDate = new Date();
@@ -140,7 +141,7 @@ export class ConnectedBehavior extends StateShifterBehaviorBase<
       this.session.sendOne({ type: MessageType.KEEP_ALIVE });
       if (
         new Date().getTime() - this.lastKeepAliveReceivedDate.getTime() >
-        this.keepAliveNumSeconds * 1000
+        this.keepAliveTimeOutSeconds * 1000
       )
         void this.session.stateMachine.shiftTo("closing");
     }, this.keepAliveNumSeconds * 1000);
@@ -157,6 +158,8 @@ export class ConnectedBehavior extends StateShifterBehaviorBase<
   }) => {
     if (action == SessionStateEventAction.MESSAGE) {
       switch (payload.type) {
+        case MessageType.KEEP_ALIVE:
+          this.lastKeepAliveReceivedDate = new Date();
         case MessageType.DATA:
           if (this.isValidDataMessage(payload))
             this.collectDataMessagePart(payload);

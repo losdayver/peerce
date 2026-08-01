@@ -8,7 +8,8 @@
     "test": "npm run build && jest",
     "pack:check": "npm pack --dry-run",
     "prepack": "npm run build",
-    "prepublishOnly": "npm test"
+    "lint": "eslint src",
+    "prepublishOnly": "npm run lint && npm test"
   },
   "main": "./dist/exports/main.js",
   "types": "./types/exports/main.d.ts",

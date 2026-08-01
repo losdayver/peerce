@@ -21,7 +21,7 @@ test("disconnects a session after the keep-alive timeout", async () => {
     await jest.advanceTimersByTimeAsync(5_000);
     expect(shiftTo).not.toHaveBeenCalledWith("closing");
 
-    await jest.advanceTimersByTimeAsync(5_000);
+    await jest.advanceTimersByTimeAsync(21_000);
     expect(shiftTo).toHaveBeenCalledTimes(1);
     expect(shiftTo).toHaveBeenCalledWith("closing");
     expect(sendOne).toHaveBeenCalledWith({ type: MessageType.KEEP_ALIVE });
