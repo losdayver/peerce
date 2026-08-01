@@ -4,6 +4,7 @@ src/
 node_modules/
 *.test.js
 dist/tests/
+types/tests/
 .gitignore
 .prettierrc
 eslint.config.js

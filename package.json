@@ -1,16 +1,61 @@
 {
   "name": "peerce",
-  "version": "0.1.5",
+  "version": "0.2.0-alpha.0",
   "description": "Simple UDP data transfer package based on NAT hole punching",
+  "type": "commonjs",
   "scripts": {
-    "test": "npx tsc && jest",
-    "complete-build": "npm i && npx tsc && npx tsc -p tsconfig.esm.json && npm pack"
+    "build": "tsc",
+    "test": "npm run build && jest",
+    "pack:check": "npm pack --dry-run",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm test"
   },
   "main": "./dist/exports/main.js",
   "types": "./types/exports/main.d.ts",
-  "keywords": [],
-  "author": "",
+  "exports": {
+    ".": {
+      "types": "./types/exports/main.d.ts",
+      "require": "./dist/exports/main.js",
+      "import": "./dist/exports/main.js",
+      "default": "./dist/exports/main.js"
+    }
+  },
+  "files": [
+    "dist/exports",
+    "dist/simple",
+    "dist/transport",
+    "dist/utils",
+    "types/exports",
+    "types/simple",
+    "types/transport",
+    "types/utils",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "peer-to-peer",
+    "udp",
+    "nat-traversal",
+    "file-transfer",
+    "typescript"
+  ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/losdayver/p2p_messenger.git"
+  },
+  "bugs": {
+    "url": "https://github.com/losdayver/p2p_messenger/issues"
+  },
+  "homepage": "https://github.com/losdayver/p2p_messenger#readme",
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next"
+  },
   "bin": {
     "peerce": "./dist/simple/bin/peer.js",
     "peerce-relay": "./dist/simple/bin/relay.js"
