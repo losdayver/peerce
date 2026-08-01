@@ -40,9 +40,10 @@ export class ConnectedBehavior extends StateShifterBehaviorBase<
   }
 
   private dataSender = new DataSender(this);
-  private keepAliveNumSeconds = 10;
+  private keepAliveNumSeconds = 5;
   private keepAliveInterval: NodeJS.Timeout | undefined;
   private collectorCleanupInterval: NodeJS.Timeout | undefined;
+  private lastKeepAliveReceivedDate = new Date();
 
   private readonly messageCollector = new Map<
     DataMessage["uid"],
@@ -137,6 +138,11 @@ export class ConnectedBehavior extends StateShifterBehaviorBase<
     clearInterval(this.keepAliveInterval);
     this.keepAliveInterval = setInterval(() => {
       this.session.sendOne({ type: MessageType.KEEP_ALIVE });
+      if (
+        new Date().getTime() - this.lastKeepAliveReceivedDate.getTime() >
+        this.keepAliveNumSeconds * 1000
+      )
+        void this.session.stateMachine.shiftTo("closing");
     }, this.keepAliveNumSeconds * 1000);
     clearInterval(this.collectorCleanupInterval);
     this.collectorCleanupInterval = setInterval(
