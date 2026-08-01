@@ -1,6 +1,6 @@
 {
   "name": "peerce",
-  "version": "0.2.0-alpha.0",
+  "version": "0.2.0-alpha.1",
   "description": "Simple UDP data transfer package based on NAT hole punching",
   "type": "commonjs",
   "scripts": {
