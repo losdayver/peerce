@@ -82,19 +82,26 @@ export abstract class PeerProxy {
 
 type TagProxyMap = Record<string, PeerProxy>;
 
+export interface SimpleRelayAdditionalSettings {
+  pendingRequestTTLms?: number;
+  tagProxyMap?: TagProxyMap;
+}
+
 export class SimpleRelay {
   transceiver: TransceiverIPv4;
   private readonly listenPromise: Promise<void>;
   private readonly requestCleanupInterval: NodeJS.Timeout;
   private closePromise: Promise<void> | undefined;
-
   private readonly requestMap = new Map<string, PendingSessionRequest>();
+  private readonly additional?: SimpleRelayAdditionalSettings;
 
   constructor(
     address: string,
     port: number,
-    private tagProxyMap?: TagProxyMap
+    additional?: SimpleRelayAdditionalSettings
   ) {
+    if (additional) this.additional = additional;
+
     this.transceiver = new TransceiverIPv4();
     this.listenPromise = this.transceiver.listen({ address, port });
     void this.listenPromise.catch(() => undefined);
@@ -128,11 +135,16 @@ export class SimpleRelay {
     }
   };
 
-  private removeExpiredRequests = () => {
-    const expiresBefore = Date.now() - PENDING_REQUEST_TTL_MS;
+  private removeExpiredRequests = async () => {
+    const expiresBefore =
+      Date.now() -
+      (this.additional?.pendingRequestTTLms ?? PENDING_REQUEST_TTL_MS);
 
     for (const [key, request] of this.requestMap) {
-      if (request.createdAt <= expiresBefore) this.requestMap.delete(key);
+      if (request.createdAt <= expiresBefore) {
+        this.requestMap.delete(key);
+        await this.transceiver.closeSession(request.address, request.port);
+      }
     }
   };
 
@@ -172,7 +184,8 @@ export class SimpleRelay {
 
     if (
       distantPeer &&
-      distantPeer.createdAt <= now - PENDING_REQUEST_TTL_MS
+      distantPeer.createdAt <=
+        now - (this.additional?.pendingRequestTTLms ?? PENDING_REQUEST_TTL_MS)
     ) {
       this.requestMap.delete(reverseRequestKey);
       distantPeer = undefined;
@@ -198,8 +211,8 @@ export class SimpleRelay {
     this.requestMap.delete(reverseRequestKey);
     this.requestMap.delete(requestKey);
 
-    const selfProxy = this.tagProxyMap?.[request.selfTag];
-    const distantProxy = this.tagProxyMap?.[request.distantTag];
+    const selfProxy = this.additional?.tagProxyMap?.[request.selfTag];
+    const distantProxy = this.additional?.tagProxyMap?.[request.distantTag];
 
     if (selfProxy)
       await selfProxy.setup(peerAddress, {
@@ -232,9 +245,7 @@ export class SimpleRelay {
       peerAddress.port,
       JSON.stringify({
         distantTag: request.distantTag,
-        distantAddress: selfProxy
-          ? selfProxy.address
-          : distantPeer.address,
+        distantAddress: selfProxy ? selfProxy.address : distantPeer.address,
         distantPort: selfProxy ? selfProxy.port : distantPeer.port,
       } satisfies PeerToPeerSessionRequest)
     );
