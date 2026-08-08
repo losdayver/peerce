@@ -11,8 +11,6 @@ const peer2Addr = { address: localhost, port: 50658 };
 const proxy1Addr = { address: localhost, port: 50659 };
 const proxy2Addr = { address: localhost, port: 50660 };
 
-// todo fix proxies
-
 const proxy1 = new PeerLossyProxy(proxy1Addr.address, proxy1Addr.port);
 const proxy2 = new PeerLossyProxy(proxy2Addr.address, proxy2Addr.port);
 
@@ -35,15 +33,14 @@ const peer2 = new SimplePeer({
 });
 
 const relay = new SimpleRelay(relayAddr.address, relayAddr.port, {
-  peer1: proxy1,
-  peer2: proxy2,
+  tagProxyMap: {
+    peer1: proxy1,
+    peer2: proxy2,
+  },
 });
 
 afterAll(async () => {
-  const peerResults = await Promise.allSettled([
-    peer1.close(),
-    peer2.close(),
-  ]);
+  const peerResults = await Promise.allSettled([peer1.close(), peer2.close()]);
   const infrastructureResults = await Promise.allSettled([
     relay.close(),
     proxy1.close(),
@@ -77,10 +74,7 @@ test("Lossy data transmission", async () => {
   const onPercentageChange = (fileName: string, percentage: number) => {
     receivedPercentages.push(percentage);
   };
-  const onOutgoingPercentageChange = (
-    fileName: string,
-    percentage: number
-  ) => {
+  const onOutgoingPercentageChange = (fileName: string, percentage: number) => {
     outgoingFileNames.push(fileName);
     outgoingPercentages.push(percentage);
   };
@@ -113,8 +107,9 @@ test("Lossy data transmission", async () => {
   ).toBeTruthy();
   expect(receivedFileNames).toEqual([testData.fileName]);
   expect(receivedPercentages.at(-1)).toBe(1);
-  expect(outgoingFileNames.every((fileName) => fileName === testData.fileName))
-    .toBeTruthy();
+  expect(
+    outgoingFileNames.every((fileName) => fileName === testData.fileName)
+  ).toBeTruthy();
   expect(outgoingPercentages.at(-1)).toBe(1);
 
   proxy1.lossPercentage = 0;

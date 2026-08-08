@@ -23,7 +23,8 @@ interface PeerPairFixture {
 const waitForEvent = (
   subscribe: (listener: () => void) => void,
   unsubscribe: (listener: () => void) => void,
-  description: string
+  description: string,
+  timeoutMs = EVENT_TIMEOUT_MS
 ): Promise<void> =>
   new Promise<void>((resolve, reject) => {
     const cleanup = () => {
@@ -37,26 +38,28 @@ const waitForEvent = (
     const timeout = setTimeout(() => {
       cleanup();
       reject(new Error(`Timed out waiting for ${description}`));
-    }, EVENT_TIMEOUT_MS);
+    }, timeoutMs);
 
     subscribe(onEvent);
   });
 
-const waitForIncomingTransmission = (
-  peer: SimplePeer,
-  description: string
-) =>
+const waitForIncomingTransmission = (peer: SimplePeer, description: string) =>
   waitForEvent(
     (listener) => peer.once("onIncomingTransmissionStart", listener),
     (listener) => peer.off("onIncomingTransmissionStart", listener),
     description
   );
 
-const waitForTransportClose = (peer: SimplePeer, description: string) =>
+const waitForTransportClose = (
+  peer: SimplePeer,
+  description: string,
+  timeoutMs = EVENT_TIMEOUT_MS
+) =>
   waitForEvent(
     (listener) => peer.transceiver.once("onClosed", listener),
     (listener) => peer.transceiver.off("onClosed", listener),
-    description
+    description,
+    timeoutMs
   );
 
 const createFixtureEvents = (peer: SimplePeer): FixtureEvents => {
@@ -78,8 +81,7 @@ const createFixtureEvents = (peer: SimplePeer): FixtureEvents => {
 const throwCleanupErrors = (results: PromiseSettledResult<void>[]) => {
   const errors = results
     .filter(
-      (result): result is PromiseRejectedResult =>
-        result.status === "rejected"
+      (result): result is PromiseRejectedResult => result.status === "rejected"
     )
     .map((result) => result.reason);
 
@@ -153,6 +155,48 @@ const expectCleanShutdown = (
   expect(fixture.peerA.stateMachine.getCurrentState()).toBe("closing");
   expect(fixture.peerB.stateMachine.getCurrentState()).toBe("closing");
 };
+
+const pendingRequestTTLms = 2_000;
+test(
+  "peer with a pending connection request disconnects after its TTL",
+  async () => {
+    const relay = new SimpleRelay(LOCALHOST, 46_150, { pendingRequestTTLms });
+    const peer = new SimplePeer({
+      selfTag: "peer-a-46151",
+      distantTag: "missing-peer",
+      relayAddr: LOCALHOST,
+      relayPort: 46_150,
+      selfAddr: LOCALHOST,
+      selfPort: 46_151,
+    });
+    const peerEvents = createFixtureEvents(peer);
+
+    try {
+      await relay.ready();
+      const requestStartedAt = Date.now();
+      const peerClosed = waitForTransportClose(
+        peer,
+        "pending-request peer transport close",
+        pendingRequestTTLms + 2 * EVENT_TIMEOUT_MS
+      );
+
+      void peer.requestSessionViaRelayAsync();
+      await peerClosed;
+
+      expect(Date.now() - requestStartedAt).toBeGreaterThanOrEqual(
+        pendingRequestTTLms
+      );
+      expect(peerEvents.closingReasons).toEqual(["RELAY_CLOSE"]);
+      expect(peerEvents.transportErrors).toEqual([]);
+      expect(peer.stateMachine.getCurrentState()).toBe("closing");
+    } finally {
+      const peerResults = await Promise.allSettled([peer.close()]);
+      const relayResults = await Promise.allSettled([relay.close()]);
+      throwCleanupErrors([...peerResults, ...relayResults]);
+    }
+  },
+  pendingRequestTTLms + 3 * EVENT_TIMEOUT_MS
+);
 
 test("peer A closes locally and peer B observes a remote disconnect", async () => {
   const fixture = await createConnectedPeerPair(46_100, 46_101, 46_102);
