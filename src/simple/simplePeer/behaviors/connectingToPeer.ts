@@ -13,11 +13,17 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     super();
   }
 
+  onRelayClose = async () => {
+    await this.simplePeer.close("RELAY_CLOSE");
+  };
+
   onEnter = async () => {
     const { initialParams, transceiver, stateMachine } = this.simplePeer;
     const { distantTag, relayAddr, relayPort, selfTag } = initialParams;
 
     logInfo(`awaiting session request from "${distantTag}"`);
+
+    transceiver.on("onSessionClosed", this.onRelayClose);
 
     // Awaiting session request
     let sessionRequest: PeerToPeerSessionRequest;
@@ -97,6 +103,7 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
   };
   onExit = async () => {
     const { relayAddr, relayPort } = this.simplePeer.initialParams;
+    this.simplePeer.transceiver.off("onSessionClosed", this.onRelayClose);
     logInfo(`closed relay connection`);
     await this.simplePeer.transceiver.closeSession(relayAddr, relayPort);
   };

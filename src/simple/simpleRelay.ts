@@ -128,11 +128,14 @@ export class SimpleRelay {
     }
   };
 
-  private removeExpiredRequests = () => {
+  private removeExpiredRequests = async () => {
     const expiresBefore = Date.now() - PENDING_REQUEST_TTL_MS;
 
     for (const [key, request] of this.requestMap) {
-      if (request.createdAt <= expiresBefore) this.requestMap.delete(key);
+      if (request.createdAt <= expiresBefore) {
+        this.requestMap.delete(key);
+        await this.transceiver.closeSession(request.address, request.port);
+      }
     }
   };
 
@@ -170,10 +173,7 @@ export class SimpleRelay {
     const now = Date.now();
     let distantPeer = this.requestMap.get(reverseRequestKey);
 
-    if (
-      distantPeer &&
-      distantPeer.createdAt <= now - PENDING_REQUEST_TTL_MS
-    ) {
+    if (distantPeer && distantPeer.createdAt <= now - PENDING_REQUEST_TTL_MS) {
       this.requestMap.delete(reverseRequestKey);
       distantPeer = undefined;
     }
@@ -232,9 +232,7 @@ export class SimpleRelay {
       peerAddress.port,
       JSON.stringify({
         distantTag: request.distantTag,
-        distantAddress: selfProxy
-          ? selfProxy.address
-          : distantPeer.address,
+        distantAddress: selfProxy ? selfProxy.address : distantPeer.address,
         distantPort: selfProxy ? selfProxy.port : distantPeer.port,
       } satisfies PeerToPeerSessionRequest)
     );

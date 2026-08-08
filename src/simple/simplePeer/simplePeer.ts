@@ -97,7 +97,7 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
     });
   };
 
-  close = (): Promise<void> => {
+  close = (reason?: ClosingReason): Promise<void> => {
     if (this.closePromise) return this.closePromise;
 
     const state = this.stateMachine.getCurrentState();
@@ -115,10 +115,8 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
     });
 
     this.__prematureCloseCallback();
-    this.emit("onClosing", "SELF_CLOSE");
-    void this.stateMachine
-      .shiftTo("closing")
-      .then(resolveClose, rejectClose);
+    this.emit("onClosing", reason ?? "SELF_CLOSE");
+    void this.stateMachine.shiftTo("closing").then(resolveClose, rejectClose);
 
     return this.closePromise;
   };
