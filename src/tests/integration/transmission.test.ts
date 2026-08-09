@@ -5,11 +5,11 @@ import { SimplePeer } from "../../simple/simplePeer/simplePeer";
 import { SimpleRelay } from "../../simple/simpleRelay";
 
 const localhost = "127.0.0.1";
-const relayAddr = { address: localhost, port: 50656 };
-const peer1Addr = { address: localhost, port: 50657 };
-const peer2Addr = { address: localhost, port: 50658 };
-const proxy1Addr = { address: localhost, port: 50659 };
-const proxy2Addr = { address: localhost, port: 50660 };
+const relayAddr = { address: localhost, port: 40656 };
+const peer1Addr = { address: localhost, port: 40657 };
+const peer2Addr = { address: localhost, port: 40658 };
+const proxy1Addr = { address: localhost, port: 40659 };
+const proxy2Addr = { address: localhost, port: 40660 };
 
 const proxy1 = new PeerLossyProxy(proxy1Addr.address, proxy1Addr.port);
 const proxy2 = new PeerLossyProxy(proxy2Addr.address, proxy2Addr.port);
@@ -114,3 +114,26 @@ test("Lossy data transmission", async () => {
 
   proxy1.lossPercentage = 0;
 }, 10000);
+
+test("100 MiB data transmission", async () => {
+  const payload = Buffer.alloc(100 * 1024 * 1024, 0xa5);
+  for (let offset = 0, chunkNo = 0; offset < payload.length; offset += 4096) {
+    payload.writeUInt32LE(chunkNo, offset);
+    chunkNo += 1;
+  }
+
+  const fileName = "100-mib-payload.bin";
+  const dataPromise = once<{ buffer: Buffer; fileName: string }>(
+    peer2,
+    "onFullMessage"
+  );
+
+  proxy1.lossPercentage = 0;
+  peer1.createOutgoingTransmission({ fileName, payload });
+
+  const data = await dataPromise;
+
+  expect(data.fileName).toBe(fileName);
+  expect(data.buffer.length).toBe(payload.length);
+  expect(data.buffer.equals(payload)).toBe(true);
+}, 120_000);

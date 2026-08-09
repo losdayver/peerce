@@ -3,12 +3,13 @@ import {
   StateShifterConfig,
   TransitionGraph,
 } from "state-shifter";
-import { Message } from "../messageBuffer";
+import { DataMessage, Message } from "../messageBuffer";
 
 export interface SessionEventMap {
   connecting: [];
   connected: [];
   receive: [message: Buffer];
+  transmitted: [uid: DataMessage["uid"]];
   closing: [];
   closed: [];
   error: [];
