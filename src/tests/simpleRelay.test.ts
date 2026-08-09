@@ -3,10 +3,7 @@ import { PeerToRelaySessionRequest } from "../simple/simpleProtocol";
 
 const LOCALHOST = "127.0.0.1";
 
-const createRequest = (
-  selfTag: string,
-  distantTag: string
-): Buffer =>
+const createRequest = (selfTag: string, distantTag: string): Buffer =>
   Buffer.from(
     JSON.stringify({
       selfTag,
@@ -18,10 +15,10 @@ test("ignores malformed relay session requests", async () => {
   const relay = new SimpleRelay(LOCALHOST, 46_200);
   const send = jest
     .spyOn(relay.transceiver, "send")
-    .mockImplementation(() => undefined);
+    .mockImplementation(() => Promise.resolve());
   const consoleLog = jest
     .spyOn(console, "log")
-    .mockImplementation(() => undefined);
+    .mockImplementation(() => Promise.resolve());
   const peerAddress = { address: LOCALHOST, port: 46_201 };
   const invalidMessages = [
     Buffer.alloc(0),
@@ -53,7 +50,7 @@ test("does not match a session request after its TTL expires", async () => {
   const relay = new SimpleRelay(LOCALHOST, 46_210);
   const send = jest
     .spyOn(relay.transceiver, "send")
-    .mockImplementation(() => undefined);
+    .mockImplementation(() => Promise.resolve());
   const consoleLog = jest
     .spyOn(console, "log")
     .mockImplementation(() => undefined);
@@ -84,10 +81,10 @@ test("removes both requests after matching the peers", async () => {
   const relay = new SimpleRelay(LOCALHOST, 46_220);
   const send = jest
     .spyOn(relay.transceiver, "send")
-    .mockImplementation(() => undefined);
+    .mockImplementation(() => Promise.resolve());
   const consoleLog = jest
     .spyOn(console, "log")
-    .mockImplementation(() => undefined);
+    .mockImplementation(() => Promise.resolve());
   const peerA = { address: LOCALHOST, port: 46_221 };
   const peerB = { address: LOCALHOST, port: 46_222 };
 

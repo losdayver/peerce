@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:stream";
+import { setTimeout as nodeSleep } from "node:timers/promises";
 
 export const getResolver = () => {
   let resolver: { resolve: (() => void) | undefined } = { resolve: undefined };
@@ -8,7 +9,7 @@ export const getResolver = () => {
   return { promise, resolver };
 };
 
-export const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+export const sleep = (ms: number) => nodeSleep(ms);
 
 export const once = <T>(emitter: EventEmitter, event: string) =>
   new Promise<T>((resolve) => {

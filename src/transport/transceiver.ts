@@ -366,7 +366,7 @@ export class TransceiverIPv4 extends EventEmitter<TransceiverEventMap> {
     const session = this.sessionMap.get(`${address}:${port}`);
     if (!session)
       throw new Error(`Session does not exist for ${address}:${port}`);
-    session.sendData(msg);
+    return session.sendData(msg);
   }
 
   public sendDatagram(address: string, port: number, msg: Buffer) {

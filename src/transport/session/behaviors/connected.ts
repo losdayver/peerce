@@ -173,7 +173,7 @@ export class ConnectedBehavior extends StateShifterBehaviorBase<
           void this.session.close();
       }
     } else if (action == SessionStateEventAction.SEND_DATA) {
-      this.dataSender.registerNewTransmission(payload);
+      return this.dataSender.registerNewTransmission(payload);
     }
   };
 
@@ -194,7 +194,8 @@ class DataSender {
   collectDataAck = (message: DataAckMessage) => {
     if (this.isDisposed) return;
     const transmission = this.transmissionMap.get(message.uid);
-    transmission?.collectDataAck(message);
+    if (transmission?.collectDataAck(message))
+      this.connectedState.session.emit("transmitted", message.uid);
   };
 
   registerNewTransmission = (data: string | Buffer) => {
@@ -203,6 +204,7 @@ class DataSender {
     const uid = transmission.register(data);
     this.transmissionMap.set(uid, transmission);
     transmission.transmit();
+    return uid;
   };
 
   unregisterTransmission = (uid: DataMessage["uid"]) => {
@@ -229,6 +231,7 @@ class Transmission {
   private dataAckMap = new Map<DataAckMessage["ack"], DataAckMessage>();
   private greatestSequentialAckNum = -1;
   private resendTimer: NodeJS.Timeout | undefined;
+  private slidingWindowSize = 20;
 
   resetResendTimer = () => {
     if (this.isStopped) return;
@@ -260,7 +263,10 @@ class Transmission {
         let i = this.greatestSequentialAckNum + 1;
         !this.isStopped &&
         i <
-          Math.min(this.greatestSequentialAckNum + 20, this.constructed!.total);
+          Math.min(
+            this.greatestSequentialAckNum + this.slidingWindowSize,
+            this.constructed!.total
+          );
         i++
       ) {
         const hasAck = this.dataAckMap.get(i);
@@ -293,13 +299,17 @@ class Transmission {
     if (this.isStopped) return;
     const { session } = this.connectedState;
     const { transceiverIPv4, address, port } = session;
-    for (const buffer of this.constructed!.buffers)
+    for (const buffer of this.constructed!.buffers.slice(
+      0,
+      this.slidingWindowSize
+    ))
       transceiverIPv4.sendDatagram(address, port, buffer);
     this.resetResendTimer();
   };
 
   collectDataAck = (message: DataAckMessage) => {
     if (this.isStopped) return;
+    const isFirstAck = this.dataAckMap.size === 0;
     this.dataAckMap.set(message.ack, message);
     while (this.dataAckMap.has(this.greatestSequentialAckNum + 1)) {
       this.greatestSequentialAckNum += 1;
@@ -311,6 +321,8 @@ class Transmission {
       this.resendTimer = undefined;
       this.dataSender.unregisterTransmission(this.constructed.uid);
     } else this.resetResendTimer();
+
+    return isFirstAck;
   };
 
   cancel = () => {

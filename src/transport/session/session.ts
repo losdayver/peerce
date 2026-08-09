@@ -1,5 +1,5 @@
 import { EventEmitter, once } from "node:stream";
-import { Message, MessageBuffer } from "../messageBuffer";
+import { DataMessage, Message, MessageBuffer } from "../messageBuffer";
 import { TransceiverIPv4 } from "../transceiver";
 import { ClosedBehavior } from "./behaviors/closed";
 import { ClosingBehavior } from "./behaviors/closing";
@@ -47,13 +47,22 @@ export class Session extends EventEmitter<SessionEventMap> {
     );
   }
 
-  sendData(raw: string | Buffer) {
+  async sendData(raw: string | Buffer) {
     if (this.stateMachine.getCurrentState() != "connected")
       throw new Error("Cannot send while not connected");
-    this.stateMachine.dispatchEvent({
+    let resolve: () => void;
+    const promise = new Promise<void>((res) => (resolve = res));
+    const callback = (transmittedUid: DataMessage["uid"]) => {
+      if (uid != transmittedUid) return;
+      this.off("transmitted", callback);
+      resolve();
+    };
+    this.on("transmitted", callback);
+    const uid = this.stateMachine.dispatchEvent({
       action: SessionStateEventAction.SEND_DATA,
       payload: raw,
-    });
+    }) as unknown as DataMessage["uid"];
+    return await promise;
   }
 
   handleMessage(message: Message) {
@@ -89,8 +98,7 @@ export class Session extends EventEmitter<SessionEventMap> {
     if (state === "closed" || state === "error") return;
 
     const closedPromise = once(this, "closed");
-    if (state !== "closing")
-      await this.stateMachine.shiftTo("closing");
+    if (state !== "closing") await this.stateMachine.shiftTo("closing");
     await closedPromise;
   };
 }

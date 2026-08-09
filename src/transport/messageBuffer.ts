@@ -48,7 +48,7 @@ export type DataAckMessage = Omit<Message, "seq" | "checksum" | "payload"> & {
 };
 
 export class MessageBuffer {
-  static maxPayloadSize = 500;
+  static maxPayloadSize = 800;
 
   static decode(buffer: Buffer): Message | null {
     if (buffer.length < HEADER_SIZE) return null;
