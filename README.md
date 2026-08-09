@@ -12,10 +12,8 @@ Experimental peer-to-peer data transfer for Node.js over UDP, with NAT hole punc
 
 ## Install
 
-After publication, pre-release versions will be available under the `next` tag:
-
 ```bash
-npm install peerce@next
+npm install peerce@latest
 ```
 
 ## Quick start
@@ -58,7 +56,7 @@ The other peer must use the reverse tags (`bob` → `alice`) and a different `se
 
 ## Status
 
-`0.2.0-alpha.0` is intended for experiments, feedback, and protocol development only. 🧪⚠️
+`0.2.0-alpha.X` is intended for experiments, feedback, and protocol development only. 🧪⚠️
 
 ## License
 
