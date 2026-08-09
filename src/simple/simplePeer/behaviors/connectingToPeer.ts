@@ -48,7 +48,7 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     };
     transceiver.once("onReceive", sessionRequestListener);
 
-    transceiver.send(
+    void transceiver.send(
       relayAddr,
       relayPort,
       JSON.stringify({
