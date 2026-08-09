@@ -229,7 +229,7 @@ export class SimpleRelay {
       `request satisfied ${request.selfTag}:${request.distantTag}`,
       AnsiColor.BRIGHTGREEN
     );
-    this.transceiver.send(
+    void this.transceiver.send(
       distantPeer.address,
       distantPeer.port,
       JSON.stringify({
@@ -240,7 +240,7 @@ export class SimpleRelay {
         distantPort: distantProxy ? distantProxy.port : peerAddress.port,
       } satisfies PeerToPeerSessionRequest)
     );
-    this.transceiver.send(
+    void this.transceiver.send(
       peerAddress.address,
       peerAddress.port,
       JSON.stringify({
