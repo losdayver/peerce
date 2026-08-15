@@ -31,6 +31,8 @@ const cliOptions = {
   fromFile: { type: "string" },
   payload: { type: "string" },
   outDir: { type: "string" },
+  encrypt: { type: "boolean" },
+  vaultDir: { type: "string" },
 } satisfies Record<keyof PeerConfig, ParseArgsOptionDescriptor>;
 
 const { values } = parseArgs({

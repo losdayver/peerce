@@ -5,7 +5,6 @@ import {
   SimpleProtocolConfig,
   SimpleProtocolPeerConfig,
 } from "../simpleProtocol";
-import { once } from "../../utils/promiseUtils";
 import {
   SimplePeerStateShifter,
   SimplePeerStateShifterConfig,
@@ -31,6 +30,9 @@ export type ClosingReason =
 interface SimplePeerEventEmitterMap {
   onConnectedToRelay: [];
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
+  onEncryptionNegotiationFailed: [
+    sessionRequest: PeerToPeerSessionRequest,
+  ];
   onIncomingTransmissionStart: [fileName: string];
   onIncomingTransmissionPercentageChange: [
     fileName: string,
@@ -74,13 +76,44 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
     closing: new Closing(this),
   };
 
-  requestSessionViaRelayAsync = async () => {
-    const sessionPromise = once<PeerToPeerSessionRequest>(
-      this,
-      "onConnectedToPeer"
-    );
-    await this.stateMachine.shiftTo("connectingToRelay");
-    return await sessionPromise;
+  requestSessionViaRelayAsync = async (): Promise<
+    PeerToPeerSessionRequest | undefined
+  > => {
+    let cleanupOutcomeListeners = () => {};
+    const outcomePromise = new Promise<
+      PeerToPeerSessionRequest | undefined
+    >((resolve) => {
+      const onConnected = (sessionRequest: PeerToPeerSessionRequest) => {
+        cleanupOutcomeListeners();
+        resolve(sessionRequest);
+      };
+      const onEncryptionNegotiationFailed = () => {
+        cleanupOutcomeListeners();
+        resolve(undefined);
+      };
+
+      cleanupOutcomeListeners = () => {
+        this.off("onConnectedToPeer", onConnected);
+        this.off(
+          "onEncryptionNegotiationFailed",
+          onEncryptionNegotiationFailed
+        );
+      };
+
+      this.on("onConnectedToPeer", onConnected);
+      this.on(
+        "onEncryptionNegotiationFailed",
+        onEncryptionNegotiationFailed
+      );
+    });
+
+    try {
+      await this.stateMachine.shiftTo("connectingToRelay");
+      return await outcomePromise;
+    } catch (cause) {
+      cleanupOutcomeListeners();
+      throw cause;
+    }
   };
 
   createOutgoingTransmission = ({

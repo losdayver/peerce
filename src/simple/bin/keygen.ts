@@ -6,15 +6,7 @@ import { join, resolve } from "node:path";
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { logInfo } from "../../utils/logUtils";
-
-interface KeysJsonEntry {
-  privateKeyFile: string;
-  publicKeyFile: string;
-  dateCreated: string;
-  primitive: string;
-}
-
-type KeysJson = KeysJsonEntry[];
+import { KeysJson } from "../simpleProtocol";
 
 export interface KeygenConfig {
   dir?: string;

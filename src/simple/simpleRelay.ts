@@ -10,6 +10,7 @@ import {
   logInfo,
   logWarning,
 } from "../utils/logUtils";
+import { randomBytes } from "node:crypto";
 
 const MAX_REQUEST_BYTES = 1_024;
 const MAX_TAG_LENGTH = 128;
@@ -25,6 +26,8 @@ interface PeerAddress {
 
 interface PendingSessionRequest extends PeerAddress {
   readonly createdAt: number;
+  readonly encrypt?: boolean;
+  readonly publicKey?: string;
 }
 
 const createRequestKey = (selfTag: string, distantTag: string) =>
@@ -56,13 +59,20 @@ const parseSessionRequest = (
   if (
     !isValidTag(candidate.selfTag) ||
     !isValidTag(candidate.distantTag) ||
-    candidate.selfTag === candidate.distantTag
+    candidate.selfTag === candidate.distantTag ||
+    (candidate.encrypt !== undefined &&
+      typeof candidate.encrypt !== "boolean") ||
+    (candidate.publicKey !== undefined &&
+      typeof candidate.publicKey !== "string") ||
+    (candidate.encrypt === true && typeof candidate.publicKey !== "string")
   )
     return undefined;
 
   return {
     selfTag: candidate.selfTag,
     distantTag: candidate.distantTag,
+    encrypt: candidate.encrypt,
+    publicKey: candidate.publicKey,
   };
 };
 
@@ -203,6 +213,8 @@ export class SimpleRelay {
       this.requestMap.set(requestKey, {
         ...peerAddress,
         createdAt: now,
+        encrypt: request.encrypt,
+        publicKey: request.publicKey,
       });
       logInfo(`requesting ${request.selfTag}:${request.distantTag}`);
       return;
@@ -229,6 +241,11 @@ export class SimpleRelay {
       `request satisfied ${request.selfTag}:${request.distantTag}`,
       AnsiColor.BRIGHTGREEN
     );
+
+    let salt: string | undefined;
+    if (request.encrypt || distantPeer.encrypt)
+      salt = randomBytes(12).toString("hex");
+
     void this.transceiver.send(
       distantPeer.address,
       distantPeer.port,
@@ -238,6 +255,9 @@ export class SimpleRelay {
           ? distantProxy.address
           : peerAddress.address,
         distantPort: distantProxy ? distantProxy.port : peerAddress.port,
+        encrypt: request.encrypt,
+        publicKey: request.publicKey,
+        salt,
       } satisfies PeerToPeerSessionRequest)
     );
     void this.transceiver.send(
@@ -247,6 +267,9 @@ export class SimpleRelay {
         distantTag: request.distantTag,
         distantAddress: selfProxy ? selfProxy.address : distantPeer.address,
         distantPort: selfProxy ? selfProxy.port : distantPeer.port,
+        encrypt: distantPeer.encrypt,
+        publicKey: distantPeer.publicKey,
+        salt,
       } satisfies PeerToPeerSessionRequest)
     );
   };

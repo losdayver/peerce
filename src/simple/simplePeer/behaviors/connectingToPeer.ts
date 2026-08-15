@@ -2,11 +2,22 @@ import { SimplePeerStateShifterConfig } from "../stateMeta";
 import { SimplePeer } from "../simplePeer";
 import { getResolver } from "../../../utils/promiseUtils";
 import {
+  KeysJson,
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
 } from "../../simpleProtocol";
-import { logInfo } from "../../../utils/logUtils";
+import { logError, logInfo } from "../../../utils/logUtils";
 import { StateShifterBehaviorBase } from "state-shifter";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import {
+  createPrivateKey,
+  createPublicKey,
+  diffieHellman,
+  hkdfSync,
+  KeyObject,
+} from "node:crypto";
+import { homedir } from "node:os";
 
 export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
   constructor(private simplePeer: SimplePeer) {
@@ -21,11 +32,33 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     const { initialParams, transceiver, stateMachine } = this.simplePeer;
     const { distantTag, relayAddr, relayPort, selfTag } = initialParams;
 
+    let privateKey: KeyObject | undefined;
+    let publicKey: string | undefined;
+
+    if (this.simplePeer.initialParams.encrypt) {
+      const { vaultDir = join(homedir(), ".peerce", "vault") } =
+        this.simplePeer.initialParams;
+      const keysJson = JSON.parse(
+        await readFile(join(vaultDir, "keys.json"), "utf8")
+      ) as KeysJson;
+      const latestEntry = keysJson.at(-1);
+
+      if (!latestEntry) throw new Error("No keys found in keys.json");
+
+      const [privateKeyPem, publicKeyPem] = await Promise.all([
+        readFile(join(vaultDir, latestEntry.privateKeyFile)),
+        readFile(join(vaultDir, latestEntry.publicKeyFile)),
+      ]);
+
+      privateKey = createPrivateKey(privateKeyPem);
+      publicKey = publicKeyPem.toString("utf8");
+    }
+
     logInfo(`awaiting session request from "${distantTag}"`);
 
     transceiver.on("onSessionClosed", this.onRelayClose);
 
-    // Awaiting session request
+    // Awaiting session request from relay
     let sessionRequest: PeerToPeerSessionRequest;
     let { promise: peerRequestPromise, resolver: peerRequestResolver } =
       getResolver();
@@ -54,6 +87,10 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
       JSON.stringify({
         selfTag,
         distantTag,
+        encrypt: this.simplePeer.initialParams.encrypt,
+        ...(this.simplePeer.initialParams.encrypt && publicKey
+          ? { publicKey }
+          : {}),
       } satisfies PeerToRelaySessionRequest)
     );
 
@@ -68,6 +105,34 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
 
     logInfo(`got session request from "${distantTag}"`);
     // Got session request object and trying to connect to peer
+
+    if (
+      (this.simplePeer.initialParams.encrypt && !sessionRequest!.encrypt) ||
+      (!this.simplePeer.initialParams.encrypt && sessionRequest!.encrypt)
+    ) {
+      logError("Encryption negotiation failed");
+      this.simplePeer.emit("onEncryptionNegotiationFailed", sessionRequest!);
+      await stateMachine.shiftTo("closing");
+      return;
+    }
+
+    let derivedKey: Buffer | undefined;
+    if (this.simplePeer.initialParams.encrypt) {
+      if (!privateKey || !publicKey)
+        throw new Error("Local key pair was not loaded");
+      if (!sessionRequest!.publicKey)
+        throw new Error("Distant peer did not provide its public key");
+
+      const distantPublicKey = createPublicKey(sessionRequest!.publicKey);
+      const sharedSecret = diffieHellman({
+        privateKey,
+        publicKey: distantPublicKey,
+      });
+
+      derivedKey = Buffer.from(
+        hkdfSync("sha256", sharedSecret, sessionRequest!.salt!, "todo: aad", 32)
+      );
+    }
 
     logInfo(
       `connecting to peer ${sessionRequest!.distantAddress}:${sessionRequest!.distantPort}`
@@ -99,7 +164,10 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
 
     this.simplePeer.emit("onConnectedToPeer", sessionRequest!);
 
-    await stateMachine.shiftTo("connectedToPeer", sessionRequest!);
+    await stateMachine.shiftTo("connectedToPeer", {
+      ...sessionRequest!,
+      derivedKey,
+    });
   };
   onExit = async () => {
     const { relayAddr, relayPort } = this.simplePeer.initialParams;
