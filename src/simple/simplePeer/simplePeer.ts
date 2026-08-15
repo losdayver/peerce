@@ -3,7 +3,6 @@ import {
   KnownTagsEntry,
   PeerToPeerMessageDescriptor,
   PeerToPeerSessionRequest,
-  SimpleProtocolConfig,
   SimpleProtocolPeerConfig,
 } from "../simpleProtocol";
 import {
