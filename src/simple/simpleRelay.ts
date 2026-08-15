@@ -242,8 +242,13 @@ export class SimpleRelay {
       AnsiColor.BRIGHTGREEN
     );
 
+    const negotiationFailure =
+      Boolean(request.encrypt) !== Boolean(distantPeer.encrypt)
+        ? ("ENCRYPTION_MISMATCH" as const)
+        : undefined;
+
     let salt: string | undefined;
-    if (request.encrypt || distantPeer.encrypt)
+    if (!negotiationFailure && request.encrypt && distantPeer.encrypt)
       salt = randomBytes(12).toString("hex");
 
     void this.transceiver.send(
@@ -258,6 +263,7 @@ export class SimpleRelay {
         encrypt: request.encrypt,
         publicKey: request.publicKey,
         salt,
+        negotiationFailure,
       } satisfies PeerToPeerSessionRequest)
     );
     void this.transceiver.send(
@@ -270,6 +276,7 @@ export class SimpleRelay {
         encrypt: distantPeer.encrypt,
         publicKey: distantPeer.publicKey,
         salt,
+        negotiationFailure,
       } satisfies PeerToPeerSessionRequest)
     );
   };

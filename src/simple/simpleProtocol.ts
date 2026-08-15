@@ -6,6 +6,8 @@ export interface PeerToRelaySessionRequest {
   publicKey?: string;
 }
 
+export type SessionNegotiationFailure = "ENCRYPTION_MISMATCH";
+
 export interface PeerToPeerSessionRequest {
   distantTag: string;
   distantAddress: string;
@@ -13,6 +15,7 @@ export interface PeerToPeerSessionRequest {
   encrypt?: boolean;
   publicKey?: string;
   salt?: string;
+  negotiationFailure?: SessionNegotiationFailure;
 }
 
 export interface PeerToPeerMessage {

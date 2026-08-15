@@ -14,19 +14,18 @@ const ENCRYPTED_PEER_B_PORT = 46_402;
 const MISMATCH_RELAY_PORT = 46_410;
 const MISMATCH_ENCRYPTED_PEER_PORT = 46_411;
 const MISMATCH_PLAIN_PEER_PORT = 46_412;
+const CLI_MISMATCH_RELAY_PORT = 46_420;
 const EVENT_TIMEOUT_MS = 10_000;
 
 const execFileAsync = promisify(execFile);
 const keygenPath = resolve(__dirname, "../../simple/bin/keygen.js");
+const exchangePath = resolve(__dirname, "../../simple/bin/peer.js");
 
 let vaultRoot: string;
 let peerAVault: string;
 let peerBVault: string;
 
-const withTimeout = <T>(
-  promise: Promise<T>,
-  description: string
-): Promise<T> =>
+const withTimeout = <T>(promise: Promise<T>, description: string): Promise<T> =>
   new Promise<T>((resolvePromise, rejectPromise) => {
     const timeout = setTimeout(
       () => rejectPromise(new Error(`Timed out waiting for ${description}`)),
@@ -79,8 +78,7 @@ const closePeersAndRelay = async (
   ]);
   const errors = results
     .filter(
-      (result): result is PromiseRejectedResult =>
-        result.status === "rejected"
+      (result): result is PromiseRejectedResult => result.status === "rejected"
     )
     .map((result) => result.reason);
 
@@ -195,10 +193,7 @@ test("peers report an encryption negotiation mismatch", async () => {
   const plainConnect = jest.spyOn(plainPeer.transceiver, "connect");
   encryptedPeer.on("onConnectedToPeer", encryptedConnected);
   plainPeer.on("onConnectedToPeer", plainConnected);
-  encryptedPeer.on(
-    "onEncryptionNegotiationFailed",
-    encryptedNegotiationFailed
-  );
+  encryptedPeer.on("onEncryptionNegotiationFailed", encryptedNegotiationFailed);
   plainPeer.on("onEncryptionNegotiationFailed", plainNegotiationFailed);
 
   try {
@@ -222,6 +217,12 @@ test("peers report an encryption negotiation mismatch", async () => {
     expect(plainConnected).not.toHaveBeenCalled();
     expect(encryptedNegotiationFailed).toHaveBeenCalledTimes(1);
     expect(plainNegotiationFailed).toHaveBeenCalledTimes(1);
+    expect(encryptedNegotiationFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ negotiationFailure: "ENCRYPTION_MISMATCH" })
+    );
+    expect(plainNegotiationFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ negotiationFailure: "ENCRYPTION_MISMATCH" })
+    );
     expect(encryptedConnect).toHaveBeenCalledTimes(1);
     expect(encryptedConnect).toHaveBeenCalledWith(
       LOCALHOST,
@@ -233,5 +234,58 @@ test("peers report an encryption negotiation mismatch", async () => {
     expect(plainPeer.stateMachine.getCurrentState()).toBe("closing");
   } finally {
     await closePeersAndRelay(relay, encryptedPeer, plainPeer);
+  }
+}, 20_000);
+
+test("CLI peers report an encryption mismatch without attempting to send", async () => {
+  const relay = new SimpleRelay(LOCALHOST, CLI_MISMATCH_RELAY_PORT);
+
+  try {
+    await relay.ready();
+    const [encryptedResult, plainResult] = await Promise.all([
+      execFileAsync(
+        process.execPath,
+        [
+          exchangePath,
+          "--relayAddr",
+          LOCALHOST,
+          "--relayPort",
+          String(CLI_MISMATCH_RELAY_PORT),
+          "--selfTag",
+          "cli-encrypted-peer",
+          "--distantTag",
+          "cli-plain-peer",
+          "--payload",
+          "must-not-be-sent",
+          "--encrypt",
+          "--vaultDir",
+          peerAVault,
+        ],
+        { timeout: EVENT_TIMEOUT_MS }
+      ),
+      execFileAsync(
+        process.execPath,
+        [
+          exchangePath,
+          "--relayAddr",
+          LOCALHOST,
+          "--relayPort",
+          String(CLI_MISMATCH_RELAY_PORT),
+          "--selfTag",
+          "cli-plain-peer",
+          "--distantTag",
+          "cli-encrypted-peer",
+        ],
+        { timeout: EVENT_TIMEOUT_MS }
+      ),
+    ]);
+
+    expect(encryptedResult.stdout).toContain("Encryption negotiation failed");
+    expect(plainResult.stdout).toContain("Encryption negotiation failed");
+    expect(encryptedResult.stderr).not.toContain("Cannot send data on closing");
+    expect(encryptedResult.stderr).toBe("");
+    expect(plainResult.stderr).toBe("");
+  } finally {
+    await relay.close();
   }
 }, 20_000);

@@ -6,7 +6,7 @@ import {
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
 } from "../../simpleProtocol";
-import { logError, logInfo } from "../../../utils/logUtils";
+import { logInfo } from "../../../utils/logUtils";
 import { StateShifterBehaviorBase } from "state-shifter";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -107,10 +107,10 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     // Got session request object and trying to connect to peer
 
     if (
-      (this.simplePeer.initialParams.encrypt && !sessionRequest!.encrypt) ||
-      (!this.simplePeer.initialParams.encrypt && sessionRequest!.encrypt)
+      sessionRequest!.negotiationFailure === "ENCRYPTION_MISMATCH" ||
+      Boolean(this.simplePeer.initialParams.encrypt) !==
+        Boolean(sessionRequest!.encrypt)
     ) {
-      logError("Encryption negotiation failed");
       this.simplePeer.emit("onEncryptionNegotiationFailed", sessionRequest!);
       await stateMachine.shiftTo("closing");
       return;

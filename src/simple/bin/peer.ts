@@ -84,7 +84,12 @@ void (async () => {
     }
   );
 
-  await simplePeer.requestSessionViaRelayAsync();
+  simplePeer.on("onEncryptionNegotiationFailed", () => {
+    logError("Encryption negotiation failed");
+  });
+
+  const sessionRequest = await simplePeer.requestSessionViaRelayAsync();
+  if (!sessionRequest) return;
 
   if (envConfig.payload)
     simplePeer.createOutgoingTransmission({
