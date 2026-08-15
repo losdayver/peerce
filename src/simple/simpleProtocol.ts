@@ -20,7 +20,7 @@ export interface PeerToPeerSessionRequest {
 
 export interface PeerToPeerMessage {
   fileName: string;
-  payload: string; // base64
+  payload: string;
   chunkNo: number;
   totalNo: number;
   authTag?: string;
@@ -57,7 +57,6 @@ export interface SimpleProtocolRelayConfig {
 }
 
 export interface PeerToPeerMessageDescriptor {
-  // mimetype
   fileName?: string;
   payload: Buffer | string;
 }
@@ -70,4 +69,14 @@ export interface KeysJsonEntry {
   primitive: string;
 }
 
+//keys.json
 export type KeysJson = KeysJsonEntry[];
+
+export interface KnownTagsEntry {
+  publicKey: string;
+  fingerprint: string;
+  lastUpdate: string; // iso string
+}
+
+//known-tags.json
+export type knownTags = Record<string, KnownTagsEntry>;

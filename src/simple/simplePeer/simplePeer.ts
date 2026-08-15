@@ -1,5 +1,6 @@
 import { TransceiverIPv4 } from "../../transport/transceiver";
 import {
+  KnownTagsEntry,
   PeerToPeerMessageDescriptor,
   PeerToPeerSessionRequest,
   SimpleProtocolConfig,
@@ -30,8 +31,11 @@ export type ClosingReason =
 interface SimplePeerEventEmitterMap {
   onConnectedToRelay: [];
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
-  onEncryptionNegotiationFailed: [
-    sessionRequest: PeerToPeerSessionRequest,
+  onEncryptionNegotiationFailed: [sessionRequest: PeerToPeerSessionRequest];
+  onPublicKeyMismatch: [
+    tag: string,
+    knownTagsEntry: KnownTagsEntry,
+    mismatched: { publicKey: string; fingerprint: string },
   ];
   onIncomingTransmissionStart: [fileName: string];
   onIncomingTransmissionPercentageChange: [
@@ -80,32 +84,29 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
     PeerToPeerSessionRequest | undefined
   > => {
     let cleanupOutcomeListeners = () => {};
-    const outcomePromise = new Promise<
-      PeerToPeerSessionRequest | undefined
-    >((resolve) => {
-      const onConnected = (sessionRequest: PeerToPeerSessionRequest) => {
-        cleanupOutcomeListeners();
-        resolve(sessionRequest);
-      };
-      const onEncryptionNegotiationFailed = () => {
-        cleanupOutcomeListeners();
-        resolve(undefined);
-      };
+    const outcomePromise = new Promise<PeerToPeerSessionRequest | undefined>(
+      (resolve) => {
+        const onConnected = (sessionRequest: PeerToPeerSessionRequest) => {
+          cleanupOutcomeListeners();
+          resolve(sessionRequest);
+        };
+        const onEncryptionNegotiationFailed = () => {
+          cleanupOutcomeListeners();
+          resolve(undefined);
+        };
 
-      cleanupOutcomeListeners = () => {
-        this.off("onConnectedToPeer", onConnected);
-        this.off(
-          "onEncryptionNegotiationFailed",
-          onEncryptionNegotiationFailed
-        );
-      };
+        cleanupOutcomeListeners = () => {
+          this.off("onConnectedToPeer", onConnected);
+          this.off(
+            "onEncryptionNegotiationFailed",
+            onEncryptionNegotiationFailed
+          );
+        };
 
-      this.on("onConnectedToPeer", onConnected);
-      this.on(
-        "onEncryptionNegotiationFailed",
-        onEncryptionNegotiationFailed
-      );
-    });
+        this.on("onConnectedToPeer", onConnected);
+        this.on("onEncryptionNegotiationFailed", onEncryptionNegotiationFailed);
+      }
+    );
 
     try {
       await this.stateMachine.shiftTo("connectingToRelay");

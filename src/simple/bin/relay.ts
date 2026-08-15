@@ -21,4 +21,4 @@ const { values } = parseArgs({
 Object.assign(envConfig, values);
 
 // npx peerce-relay --selfAddr 0.0.0.0 --selfPort 5555
-const simpleRelay = new SimpleRelay(envConfig.selfAddr!, envConfig.selfPort!);
+new SimpleRelay(envConfig.selfAddr!, envConfig.selfPort!);

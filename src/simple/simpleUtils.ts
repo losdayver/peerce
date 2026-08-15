@@ -1,5 +1,39 @@
 import crypto, { createCipheriv, createDecipheriv, randomBytes } from "crypto";
-import { PeerToPeerMessage } from "./simpleProtocol";
+import {
+  KnownTagsEntry,
+  knownTags as KnownTags,
+  PeerToPeerMessage,
+} from "./simpleProtocol";
+import { mkdir, readFile, writeFile } from "fs/promises";
+import { join } from "path";
+
+let knownTagsUpdateQueue: Promise<void> = Promise.resolve();
+
+const hasErrorCode = (
+  cause: unknown,
+  code: string
+): cause is NodeJS.ErrnoException =>
+  typeof cause === "object" &&
+  cause !== null &&
+  "code" in cause &&
+  cause.code === code;
+
+const parseKnownTags = (serialized: string): KnownTags => {
+  const value: unknown = JSON.parse(serialized);
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new Error("known-tags.json must contain a JSON object");
+
+  return value as KnownTags;
+};
+
+const readKnownTagsForUpdate = async (filePath: string): Promise<KnownTags> => {
+  try {
+    return parseKnownTags(await readFile(filePath, "utf8"));
+  } catch (cause) {
+    if (hasErrorCode(cause, "ENOENT")) return {};
+    throw cause;
+  }
+};
 
 export const chunkPeerToPeerMessages = ({
   payload,
@@ -92,4 +126,40 @@ export const decryptPayload = (
   } catch {
     throw new Error("Auth tag is incorrect");
   }
+};
+
+export const getKnownTagsEntry = async (
+  tag: string,
+  dir: string
+): Promise<KnownTagsEntry | false> => {
+  try {
+    const knownTags = parseKnownTags(
+      await readFile(join(dir, "known-tags.json"), "utf8")
+    );
+    return knownTags[tag] ?? false;
+  } catch {
+    return false;
+  }
+};
+
+export const upsertKnownTagsEntry = (
+  tag: string,
+  entry: KnownTagsEntry,
+  dir: string
+): Promise<void> => {
+  if (tag.length === 0) return Promise.reject(new Error("Tag cannot be empty"));
+
+  const update = knownTagsUpdateQueue.catch(() => undefined).then(async () => {
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const filePath = join(dir, "known-tags.json");
+    const knownTags = await readKnownTagsForUpdate(filePath);
+    knownTags[tag] = { ...entry };
+    await writeFile(filePath, JSON.stringify(knownTags, null, 2), {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+  });
+
+  knownTagsUpdateQueue = update;
+  return update;
 };

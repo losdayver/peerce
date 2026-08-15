@@ -11,6 +11,7 @@ import { StateShifterBehaviorBase } from "state-shifter";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  createHash,
   createPrivateKey,
   createPublicKey,
   diffieHellman,
@@ -18,6 +19,7 @@ import {
   KeyObject,
 } from "node:crypto";
 import { homedir } from "node:os";
+import { getKnownTagsEntry, upsertKnownTagsEntry } from "../../simpleUtils";
 
 export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
   constructor(private simplePeer: SimplePeer) {
@@ -124,6 +126,41 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
         throw new Error("Distant peer did not provide its public key");
 
       const distantPublicKey = createPublicKey(sessionRequest!.publicKey);
+
+      const publicKeyFingerprint = createHash("")
+        .update(sessionRequest!.publicKey)
+        .digest("hex");
+
+      const knownTagsDir =
+        this.simplePeer.initialParams.vaultDir ??
+        join(homedir(), ".peerce", "vault");
+      const knownTagsEntry = await getKnownTagsEntry(
+        this.simplePeer.initialParams.distantTag,
+        knownTagsDir
+      );
+
+      if (!knownTagsEntry)
+        await upsertKnownTagsEntry(
+          this.simplePeer.initialParams.distantTag,
+          {
+            fingerprint: publicKeyFingerprint,
+            publicKey: sessionRequest!.publicKey,
+            lastUpdate: new Date().toISOString(),
+          },
+          knownTagsDir
+        );
+      else if (knownTagsEntry.fingerprint !== publicKeyFingerprint)
+        // do nothing until action is taken outside of this code
+        this.simplePeer.emit(
+          "onPublicKeyMismatch",
+          this.simplePeer.initialParams.distantTag,
+          knownTagsEntry,
+          {
+            fingerprint: publicKeyFingerprint,
+            publicKey: sessionRequest!.publicKey,
+          }
+        );
+
       const sharedSecret = diffieHellman({
         privateKey,
         publicKey: distantPublicKey,

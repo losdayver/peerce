@@ -7,6 +7,7 @@ import {
   logError,
   logInfo,
   logProgress,
+  logWarning,
 } from "../../utils/logUtils";
 import { SimpleProtocolPeerConfig } from "../simpleProtocol";
 import { parseArgs, ParseArgsOptionDescriptor } from "node:util";
@@ -84,8 +85,17 @@ void (async () => {
     }
   );
 
+  simplePeer.on(
+    "onPublicKeyMismatch",
+    (tag, knownTagsEntry, { fingerprint, publicKey }) => {
+      logWarning(
+        `public key fingerprint mismatch! "${tag}" provided new public key with fingerprint: ${fingerprint}`
+      );
+    }
+  );
+
   simplePeer.on("onEncryptionNegotiationFailed", () => {
-    logError("Encryption negotiation failed");
+    logError("encryption negotiation failed");
   });
 
   const sessionRequest = await simplePeer.requestSessionViaRelayAsync();
