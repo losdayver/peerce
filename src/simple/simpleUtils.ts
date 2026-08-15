@@ -1,11 +1,18 @@
-import crypto, { createCipheriv, createDecipheriv, randomBytes } from "crypto";
+import crypto, {
+  createCipheriv,
+  createDecipheriv,
+  generateKeyPairSync,
+  randomBytes,
+} from "crypto";
 import {
   KnownTagsEntry,
   knownTags as KnownTags,
   PeerToPeerMessage,
+  KeysJson,
 } from "./simpleProtocol";
 import { mkdir, readFile, writeFile } from "fs/promises";
-import { join } from "path";
+import { join, resolve } from "path";
+import { logInfo } from "../utils/logUtils";
 
 let knownTagsUpdateQueue: Promise<void> = Promise.resolve();
 
@@ -149,17 +156,60 @@ export const upsertKnownTagsEntry = (
 ): Promise<void> => {
   if (tag.length === 0) return Promise.reject(new Error("Tag cannot be empty"));
 
-  const update = knownTagsUpdateQueue.catch(() => undefined).then(async () => {
-    await mkdir(dir, { recursive: true, mode: 0o700 });
-    const filePath = join(dir, "known-tags.json");
-    const knownTags = await readKnownTagsForUpdate(filePath);
-    knownTags[tag] = { ...entry };
-    await writeFile(filePath, JSON.stringify(knownTags, null, 2), {
-      encoding: "utf8",
-      mode: 0o600,
+  const update = knownTagsUpdateQueue
+    .catch(() => undefined)
+    .then(async () => {
+      await mkdir(dir, { recursive: true, mode: 0o700 });
+      const filePath = join(dir, "known-tags.json");
+      const knownTags = await readKnownTagsForUpdate(filePath);
+      knownTags[tag] = { ...entry };
+      await writeFile(filePath, JSON.stringify(knownTags, null, 2), {
+        encoding: "utf8",
+        mode: 0o600,
+      });
     });
-  });
 
   knownTagsUpdateQueue = update;
   return update;
+};
+
+export const createAndSaveKeyPair = async (dir: string) => {
+  await mkdir(dir!, { recursive: true, mode: 0o700 });
+
+  let keysJson: KeysJson = [];
+  try {
+    keysJson = JSON.parse(
+      (await readFile(join(dir, "keys.json"))).toString()
+    ) as KeysJson;
+  } catch {}
+
+  const { privateKey, publicKey } = generateKeyPairSync("x25519", {
+    privateKeyEncoding: {
+      type: "pkcs8",
+      format: "pem",
+    },
+    publicKeyEncoding: {
+      type: "spki",
+      format: "pem",
+    },
+  });
+
+  const now = new Date();
+
+  const publicKeyFileName = randomBytes(15).toString("hex");
+  const privateKeyFileName = randomBytes(15).toString("hex");
+
+  await writeFile(join(dir, publicKeyFileName), publicKey);
+  await writeFile(join(dir, privateKeyFileName), privateKey, { mode: 0o600 });
+
+  keysJson.push({
+    dateCreated: now.toISOString(),
+    primitive: "x25519",
+    publicKeyFile: publicKeyFileName,
+    privateKeyFile: privateKeyFileName,
+  });
+
+  await writeFile(join(dir, "keys.json"), JSON.stringify(keysJson, null, 2));
+
+  logInfo(`saved new keypair at "${resolve(dir)}"`);
 };
