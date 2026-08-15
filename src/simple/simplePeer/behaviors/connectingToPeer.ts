@@ -81,25 +81,30 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
         }
       }
     };
-    transceiver.once("onReceive", sessionRequestListener);
+    transceiver.on("onReceive", sessionRequestListener);
 
-    void transceiver.send(
-      relayAddr,
-      relayPort,
-      JSON.stringify({
-        selfTag,
-        distantTag,
-        encrypt: this.simplePeer.initialParams.encrypt,
-        ...(this.simplePeer.initialParams.encrypt && publicKey
-          ? { publicKey }
-          : {}),
-      } satisfies PeerToRelaySessionRequest)
-    );
+    let value: unknown;
+    try {
+      void transceiver.send(
+        relayAddr,
+        relayPort,
+        JSON.stringify({
+          selfTag,
+          distantTag,
+          encrypt: this.simplePeer.initialParams.encrypt,
+          ...(this.simplePeer.initialParams.encrypt && publicKey
+            ? { publicKey }
+            : {}),
+        } satisfies PeerToRelaySessionRequest)
+      );
 
-    let value = await Promise.race([
-      peerRequestPromise,
-      this.simplePeer.__prematureClosePromise,
-    ]);
+      value = await Promise.race([
+        peerRequestPromise,
+        this.simplePeer.__prematureClosePromise,
+      ]);
+    } finally {
+      transceiver.off("onReceive", sessionRequestListener);
+    }
 
     if (value == "PREMATURE_CLOSE") {
       return;
@@ -127,7 +132,7 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
 
       const distantPublicKey = createPublicKey(sessionRequest!.publicKey);
 
-      const publicKeyFingerprint = createHash("")
+      const publicKeyFingerprint = createHash("sha256")
         .update(sessionRequest!.publicKey)
         .digest("hex");
 
@@ -175,11 +180,6 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
       `connecting to peer ${sessionRequest!.distantAddress}:${sessionRequest!.distantPort}`
     );
 
-    transceiver.connect(
-      sessionRequest!.distantAddress,
-      sessionRequest!.distantPort
-    );
-
     // Await connection from peer
     let { promise: connPromise, resolver: connResolver } = getResolver();
     const peerConnectionListener = (address: string, port: number) => {
@@ -189,12 +189,21 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
       )
         connResolver.resolve?.();
     };
-    transceiver.once("onConnected", peerConnectionListener);
+    transceiver.on("onConnected", peerConnectionListener);
 
-    value = await Promise.race([
-      connPromise,
-      this.simplePeer.__prematureClosePromise,
-    ]);
+    try {
+      transceiver.connect(
+        sessionRequest!.distantAddress,
+        sessionRequest!.distantPort
+      );
+
+      value = await Promise.race([
+        connPromise,
+        this.simplePeer.__prematureClosePromise,
+      ]);
+    } finally {
+      transceiver.off("onConnected", peerConnectionListener);
+    }
     if (value == "PREMATURE_CLOSE") {
       return;
     }

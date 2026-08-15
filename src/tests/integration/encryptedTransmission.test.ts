@@ -280,8 +280,8 @@ test("CLI peers report an encryption mismatch without attempting to send", async
       ),
     ]);
 
-    expect(encryptedResult.stdout).toContain("Encryption negotiation failed");
-    expect(plainResult.stdout).toContain("Encryption negotiation failed");
+    expect(encryptedResult.stdout).toContain("encryption negotiation failed");
+    expect(plainResult.stdout).toContain("encryption negotiation failed");
     expect(encryptedResult.stderr).not.toContain("Cannot send data on closing");
     expect(encryptedResult.stderr).toBe("");
     expect(plainResult.stderr).toBe("");
