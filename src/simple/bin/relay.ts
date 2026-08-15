@@ -1,7 +1,24 @@
 #!/usr/bin/env node
 import { SimpleRelay } from "../simpleRelay";
-import { envConfig } from "../../utils/configConstructor";
+import { parseArgs, ParseArgsOptionDescriptor } from "node:util";
+import { argv } from "node:process";
+import { SimpleProtocolRelayConfig } from "../simpleProtocol";
 
-// node ./dist/simple/bin/relay.js --selfAddr 0.0.0.0 --selfPort 5555
-// p2p-s-relay --selfAddr 0.0.0.0 --selfPort 5555
-const simpleRelay = new SimpleRelay(envConfig.relayAddr!, envConfig.selfPort!);
+export interface RelayConfig extends SimpleProtocolRelayConfig {}
+
+export const envConfig: RelayConfig = {};
+
+const cliOptions = {
+  selfAddr: { type: "string" },
+  selfPort: { type: "string" },
+} satisfies Record<keyof RelayConfig, ParseArgsOptionDescriptor>;
+
+const { values } = parseArgs({
+  args: argv.slice(2),
+  options: cliOptions,
+});
+
+Object.assign(envConfig, values);
+
+// npx peerce-relay --selfAddr 0.0.0.0 --selfPort 5555
+const simpleRelay = new SimpleRelay(envConfig.selfAddr!, envConfig.selfPort!);
