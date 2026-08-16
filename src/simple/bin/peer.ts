@@ -1,24 +1,106 @@
 #!/usr/bin/env node
 import { SimplePeer } from "../simplePeer/simplePeer";
-import { envConfig, FullConfig } from "../../utils/configConstructor";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join, basename } from "node:path";
-import { logInfo } from "../../utils/logUtils";
+import { readFileSync } from "node:fs";
+import { join, basename, resolve } from "node:path";
+import {
+  AnsiColor,
+  logError,
+  logInfo,
+  logProgress,
+  logWarning,
+} from "../../utils/logUtils";
+import { SimpleProtocolPeerConfig } from "../simpleProtocol";
+import { parseArgs, ParseArgsOptionDescriptor } from "node:util";
+import { argv } from "node:process";
+import { mkdir, writeFile } from "node:fs/promises";
 
-// node ./dist/simple/bin/peer.js --relayAddr 127.0.0.1 --relayPort 5555 --selfTag me --distantTag other --payload testpayload
-// p2p-s-peer --relayAddr 127.0.0.1 --relayPort 5555 --selfTag me --distantTag other --payload testpayload
+export interface PeerConfig extends SimpleProtocolPeerConfig {
+  fromFile?: string;
+  payload?: string | Buffer;
+  outDir?: string;
+}
+
+export const envConfig: PeerConfig = {};
+
+const cliOptions = {
+  selfAddr: { type: "string" },
+  selfPort: { type: "string" },
+  selfTag: { type: "string" },
+  distantTag: { type: "string" },
+  relayAddr: { type: "string" },
+  relayPort: { type: "string" },
+  fromFile: { type: "string" },
+  payload: { type: "string" },
+  outDir: { type: "string" },
+  encrypt: { type: "boolean" },
+  vaultDir: { type: "string" },
+} satisfies Record<keyof PeerConfig, ParseArgsOptionDescriptor>;
+
+const { values } = parseArgs({
+  args: argv.slice(2),
+  options: cliOptions,
+});
+
+Object.assign(envConfig, values);
+
+envConfig.selfPort = Number(values.selfPort);
+envConfig.relayPort = Number(values.relayPort);
 
 if (envConfig.fromFile) envConfig.payload = readFileSync(envConfig.fromFile);
 
+// npx peerce-exchange --relayAddr 127.0.0.1 --relayPort 5555 --selfTag me --distantTag other --payload testpayload
 void (async () => {
-  const simplePeer = new SimplePeer(envConfig as Required<FullConfig>);
+  const simplePeer = new SimplePeer(envConfig);
+
   simplePeer.on("onFullMessage", ({ buffer, fileName }) => {
-    writeFileSync(join(envConfig.outDir ?? "", fileName), buffer);
-    console.log();
-    logInfo(`saved to "${join(envConfig.outDir ?? "", fileName)}"`);
-    process.exit(0);
+    void (async () => {
+      if (envConfig.outDir)
+        await mkdir(resolve(envConfig.outDir), { recursive: true });
+
+      const filePath = resolve(join(envConfig.outDir ?? "", fileName));
+
+      await writeFile(filePath, buffer);
+
+      logInfo(`saved to "${filePath}"`);
+
+      await simplePeer.close();
+    })();
   });
-  await simplePeer.requestSessionViaRelayAsync();
+
+  simplePeer.on(
+    "onIncomingTransmissionPercentageChange",
+    (fileName, percentage) => {
+      logProgress(`receiving ${fileName}`, percentage, AnsiColor.BRIGHTMAGENTA);
+    }
+  );
+
+  simplePeer.on(
+    "onOutgoingTransmissionPercentageChange",
+    (fileName, percentage) => {
+      logProgress(
+        `transmitting ${fileName}`,
+        percentage,
+        AnsiColor.BRIGHTMAGENTA
+      );
+    }
+  );
+
+  simplePeer.on(
+    "onPublicKeyMismatch",
+    (tag, knownTagsEntry, { fingerprint, publicKey }) => {
+      logWarning(
+        `public key fingerprint mismatch! "${tag}" provided new public key with fingerprint: ${fingerprint}`
+      );
+    }
+  );
+
+  simplePeer.on("onEncryptionNegotiationFailed", () => {
+    logError("encryption negotiation failed");
+  });
+
+  const sessionRequest = await simplePeer.requestSessionViaRelayAsync();
+  if (!sessionRequest) return;
+
   if (envConfig.payload)
     simplePeer.createOutgoingTransmission({
       payload: envConfig.payload,

@@ -10,6 +10,7 @@ import {
   logInfo,
   logWarning,
 } from "../utils/logUtils";
+import { randomBytes } from "node:crypto";
 
 const MAX_REQUEST_BYTES = 1_024;
 const MAX_TAG_LENGTH = 128;
@@ -18,13 +19,15 @@ const PENDING_REQUEST_TTL_MS = 30_000;
 const REQUEST_CLEANUP_INTERVAL_MS = 5_000;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 
-interface PeerAddress {
+export interface PeerAddress {
   readonly address: string;
   readonly port: number;
 }
 
 interface PendingSessionRequest extends PeerAddress {
   readonly createdAt: number;
+  readonly encrypt?: boolean;
+  readonly publicKey?: string;
 }
 
 const createRequestKey = (selfTag: string, distantTag: string) =>
@@ -56,13 +59,20 @@ const parseSessionRequest = (
   if (
     !isValidTag(candidate.selfTag) ||
     !isValidTag(candidate.distantTag) ||
-    candidate.selfTag === candidate.distantTag
+    candidate.selfTag === candidate.distantTag ||
+    (candidate.encrypt !== undefined &&
+      typeof candidate.encrypt !== "boolean") ||
+    (candidate.publicKey !== undefined &&
+      typeof candidate.publicKey !== "string") ||
+    (candidate.encrypt === true && typeof candidate.publicKey !== "string")
   )
     return undefined;
 
   return {
     selfTag: candidate.selfTag,
     distantTag: candidate.distantTag,
+    encrypt: candidate.encrypt,
+    publicKey: candidate.publicKey,
   };
 };
 
@@ -80,7 +90,7 @@ export abstract class PeerProxy {
   abstract close: () => Promise<void>;
 }
 
-type TagProxyMap = Record<string, PeerProxy>;
+export type TagProxyMap = Record<string, PeerProxy>;
 
 export interface SimpleRelayAdditionalSettings {
   pendingRequestTTLms?: number;
@@ -203,6 +213,8 @@ export class SimpleRelay {
       this.requestMap.set(requestKey, {
         ...peerAddress,
         createdAt: now,
+        encrypt: request.encrypt,
+        publicKey: request.publicKey,
       });
       logInfo(`requesting ${request.selfTag}:${request.distantTag}`);
       return;
@@ -229,6 +241,16 @@ export class SimpleRelay {
       `request satisfied ${request.selfTag}:${request.distantTag}`,
       AnsiColor.BRIGHTGREEN
     );
+
+    const negotiationFailure =
+      Boolean(request.encrypt) !== Boolean(distantPeer.encrypt)
+        ? ("ENCRYPTION_MISMATCH" as const)
+        : undefined;
+
+    let salt: string | undefined;
+    if (!negotiationFailure && request.encrypt && distantPeer.encrypt)
+      salt = randomBytes(12).toString("hex");
+
     void this.transceiver.send(
       distantPeer.address,
       distantPeer.port,
@@ -238,6 +260,10 @@ export class SimpleRelay {
           ? distantProxy.address
           : peerAddress.address,
         distantPort: distantProxy ? distantProxy.port : peerAddress.port,
+        encrypt: request.encrypt,
+        publicKey: request.publicKey,
+        salt,
+        negotiationFailure,
       } satisfies PeerToPeerSessionRequest)
     );
     void this.transceiver.send(
@@ -247,6 +273,10 @@ export class SimpleRelay {
         distantTag: request.distantTag,
         distantAddress: selfProxy ? selfProxy.address : distantPeer.address,
         distantPort: selfProxy ? selfProxy.port : distantPeer.port,
+        encrypt: distantPeer.encrypt,
+        publicKey: distantPeer.publicKey,
+        salt,
+        negotiationFailure,
       } satisfies PeerToPeerSessionRequest)
     );
   };

@@ -1,11 +1,10 @@
 import { TransceiverIPv4 } from "../../transport/transceiver";
 import {
+  KnownTagsEntry,
   PeerToPeerMessageDescriptor,
   PeerToPeerSessionRequest,
-  SimpleProtocolConfig,
   SimpleProtocolPeerConfig,
 } from "../simpleProtocol";
-import { once } from "../../utils/promiseUtils";
 import {
   SimplePeerStateShifter,
   SimplePeerStateShifterConfig,
@@ -26,11 +25,19 @@ export type ClosingReason =
   | "RELAY_UNAVAILABLE"
   | "RELAY_CLOSE"
   | "DISTANT_CLOSE"
-  | "SELF_CLOSE";
+  | "SELF_CLOSE"
+  | "NEGOTIATION_FAILURE"
+  | "PUBLIC_KEY_MISMATCH";
 
-interface SimplePeerEventEmitterMap {
+export interface SimplePeerEventEmitterMap {
   onConnectedToRelay: [];
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
+  onEncryptionNegotiationFailed: [sessionRequest: PeerToPeerSessionRequest];
+  onPublicKeyMismatch: [
+    tag: string,
+    knownTagsEntry: KnownTagsEntry,
+    mismatched: { publicKey: string; fingerprint: string },
+  ];
   onIncomingTransmissionStart: [fileName: string];
   onIncomingTransmissionPercentageChange: [
     fileName: string,
@@ -48,6 +55,7 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
   transceiver: TransceiverIPv4;
   stateMachine: SimplePeerStateShifter;
   initialParams: Required<SimpleProtocolPeerConfig>;
+  // Is used to prematurely close connection during "connecting to peer" procedure
   public __prematureClosePromise: Promise<"PREMATURE_CLOSE">;
   public __prematureCloseCallback: () => void;
   private closePromise: Promise<void> | undefined;
@@ -74,13 +82,41 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
     closing: new Closing(this),
   };
 
-  requestSessionViaRelayAsync = async () => {
-    const sessionPromise = once<PeerToPeerSessionRequest>(
-      this,
-      "onConnectedToPeer"
+  requestSessionViaRelayAsync = async (): Promise<
+    PeerToPeerSessionRequest | undefined
+  > => {
+    let cleanupOutcomeListeners = () => {};
+    const outcomePromise = new Promise<PeerToPeerSessionRequest | undefined>(
+      (resolve) => {
+        const onConnected = (sessionRequest: PeerToPeerSessionRequest) => {
+          cleanupOutcomeListeners();
+          resolve(sessionRequest);
+        };
+        const onEncryptionNegotiationFailed = () => {
+          cleanupOutcomeListeners();
+          resolve(undefined);
+        };
+
+        cleanupOutcomeListeners = () => {
+          this.off("onConnectedToPeer", onConnected);
+          this.off(
+            "onEncryptionNegotiationFailed",
+            onEncryptionNegotiationFailed
+          );
+        };
+
+        this.on("onConnectedToPeer", onConnected);
+        this.on("onEncryptionNegotiationFailed", onEncryptionNegotiationFailed);
+      }
     );
-    await this.stateMachine.shiftTo("connectingToRelay");
-    return await sessionPromise;
+
+    try {
+      await this.stateMachine.shiftTo("connectingToRelay");
+      return await outcomePromise;
+    } catch (cause) {
+      cleanupOutcomeListeners();
+      throw cause;
+    }
   };
 
   createOutgoingTransmission = ({
@@ -91,7 +127,7 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
       throw new Error(
         `Cannot send data on ${this.stateMachine.getCurrentState()}`
       );
-    (this.stateMachine.dispatchEvent as ConnectedToPeerEventHandler)({
+    (this.stateMachine.dispatchEvent as any)({
       fileName,
       payload,
     });
