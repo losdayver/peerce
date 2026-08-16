@@ -6,9 +6,10 @@ import crypto, {
 } from "crypto";
 import {
   KnownTagsEntry,
-  knownTags as KnownTags,
+  KnownTagsJson as KnownTags,
   PeerToPeerMessage,
   KeysJson,
+  KnownTagsJson,
 } from "./simpleProtocol";
 import { mkdir, readFile, writeFile } from "fs/promises";
 import { join, resolve } from "path";
@@ -144,6 +145,19 @@ export const getKnownTagsEntry = async (
       await readFile(join(dir, "known-tags.json"), "utf8")
     );
     return knownTags[tag] ?? false;
+  } catch {
+    return false;
+  }
+};
+
+export const getKnownTagsJson = async (
+  dir: string
+): Promise<KnownTagsJson | false> => {
+  try {
+    const knownTags = parseKnownTags(
+      await readFile(join(dir, "known-tags.json"), "utf8")
+    );
+    return knownTags;
   } catch {
     return false;
   }

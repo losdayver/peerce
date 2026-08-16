@@ -19,7 +19,7 @@ const PENDING_REQUEST_TTL_MS = 30_000;
 const REQUEST_CLEANUP_INTERVAL_MS = 5_000;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/u;
 
-interface PeerAddress {
+export interface PeerAddress {
   readonly address: string;
   readonly port: number;
 }
@@ -90,7 +90,7 @@ export abstract class PeerProxy {
   abstract close: () => Promise<void>;
 }
 
-type TagProxyMap = Record<string, PeerProxy>;
+export type TagProxyMap = Record<string, PeerProxy>;
 
 export interface SimpleRelayAdditionalSettings {
   pendingRequestTTLms?: number;

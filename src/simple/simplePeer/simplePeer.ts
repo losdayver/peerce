@@ -25,9 +25,11 @@ export type ClosingReason =
   | "RELAY_UNAVAILABLE"
   | "RELAY_CLOSE"
   | "DISTANT_CLOSE"
-  | "SELF_CLOSE";
+  | "SELF_CLOSE"
+  | "NEGOTIATION_FAILURE"
+  | "PUBLIC_KEY_MISMATCH";
 
-interface SimplePeerEventEmitterMap {
+export interface SimplePeerEventEmitterMap {
   onConnectedToRelay: [];
   onConnectedToPeer: [sessionRequest: PeerToPeerSessionRequest];
   onEncryptionNegotiationFailed: [sessionRequest: PeerToPeerSessionRequest];
@@ -53,6 +55,7 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
   transceiver: TransceiverIPv4;
   stateMachine: SimplePeerStateShifter;
   initialParams: Required<SimpleProtocolPeerConfig>;
+  // Is used to prematurely close connection during "connecting to peer" procedure
   public __prematureClosePromise: Promise<"PREMATURE_CLOSE">;
   public __prematureCloseCallback: () => void;
   private closePromise: Promise<void> | undefined;
@@ -124,7 +127,7 @@ export class SimplePeer extends EventEmitter<SimplePeerEventEmitterMap> {
       throw new Error(
         `Cannot send data on ${this.stateMachine.getCurrentState()}`
       );
-    (this.stateMachine.dispatchEvent as ConnectedToPeerEventHandler)({
+    (this.stateMachine.dispatchEvent as any)({
       fileName,
       payload,
     });

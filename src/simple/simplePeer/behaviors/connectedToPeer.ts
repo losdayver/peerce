@@ -11,7 +11,7 @@ import { StateShifterBehaviorBase } from "state-shifter";
 
 export type ConnectedToPeerEventHandler = (
   params: PeerToPeerMessageDescriptor
-) => void; // todo promise&
+) => Promise<void> | void;
 
 type IncomingChunk = Omit<PeerToPeerMessage, "payload"> & {
   payload: Buffer;

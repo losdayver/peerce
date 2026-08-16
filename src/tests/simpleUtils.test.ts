@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { knownTags as KnownTags } from "../simple/simpleProtocol";
+import { KnownTagsJson as KnownTags } from "../simple/simpleProtocol";
 import { upsertKnownTagsEntry } from "../simple/simpleUtils";
 
 const updateCount = 100;

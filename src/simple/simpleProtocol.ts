@@ -79,4 +79,4 @@ export interface KnownTagsEntry {
 }
 
 //known-tags.json
-export type knownTags = Record<string, KnownTagsEntry>;
+export type KnownTagsJson = Record<string, KnownTagsEntry>;

@@ -34,7 +34,13 @@ export const logInfo = (message: unknown) =>
   colorLog(message, AnsiColor.BRIGHTMAGENTA);
 export const logWarning = (message: unknown) =>
   colorLog(message, AnsiColor.YELLOW);
-export const logError = (message: unknown) => colorLog(message, AnsiColor.RED);
+export const logError = (message: unknown) => {
+  const msg =
+    message instanceof Error
+      ? `${message.name ?? ""}\n${message.message ?? ""}\n${message.stack ?? ""}\n${message.cause ?? ""}`.trim()
+      : message;
+  colorLog(msg, AnsiColor.RED);
+};
 
 export function logProgress(
   prefix: string,

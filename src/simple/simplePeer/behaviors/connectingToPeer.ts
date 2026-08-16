@@ -6,7 +6,7 @@ import {
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
 } from "../../simpleProtocol";
-import { logInfo } from "../../../utils/logUtils";
+import { logError, logInfo } from "../../../utils/logUtils";
 import { StateShifterBehaviorBase } from "state-shifter";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -34,9 +34,9 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     const { initialParams, transceiver, stateMachine } = this.simplePeer;
     const { distantTag, relayAddr, relayPort, selfTag } = initialParams;
 
+    // If encryption is turned on, get or create new key pair
     let privateKey: KeyObject | undefined;
     let publicKey: string | undefined;
-
     if (this.simplePeer.initialParams.encrypt) {
       const { vaultDir = join(homedir(), ".peerce", "vault") } =
         this.simplePeer.initialParams;
@@ -60,7 +60,6 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
 
     transceiver.on("onSessionClosed", this.onRelayClose);
 
-    // Awaiting session request from relay
     let sessionRequest: PeerToPeerSessionRequest;
     let { promise: peerRequestPromise, resolver: peerRequestResolver } =
       getResolver();
@@ -77,12 +76,13 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
           if (sessionRequest.distantTag !== distantTag) return;
           peerRequestResolver.resolve?.();
         } catch (e) {
-          console.error(e);
+          logError(e);
         }
       }
     };
     transceiver.on("onReceive", sessionRequestListener);
 
+    // Send own session request to the relay
     let value: unknown;
     try {
       void transceiver.send(
@@ -98,6 +98,7 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
         } satisfies PeerToRelaySessionRequest)
       );
 
+      // Await session request from relay
       value = await Promise.race([
         peerRequestPromise,
         this.simplePeer.__prematureClosePromise,
@@ -106,74 +107,92 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
       transceiver.off("onReceive", sessionRequestListener);
     }
 
-    if (value == "PREMATURE_CLOSE") {
-      return;
-    }
+    if (value == "PREMATURE_CLOSE") return;
 
     logInfo(`got session request from "${distantTag}"`);
-    // Got session request object and trying to connect to peer
 
+    // Got session request object and trying to connect to peer
     if (
       sessionRequest!.negotiationFailure === "ENCRYPTION_MISMATCH" ||
       Boolean(this.simplePeer.initialParams.encrypt) !==
         Boolean(sessionRequest!.encrypt)
     ) {
       this.simplePeer.emit("onEncryptionNegotiationFailed", sessionRequest!);
-      await stateMachine.shiftTo("closing");
+      await this.simplePeer.close("NEGOTIATION_FAILURE");
       return;
     }
 
+    // Shared secret's key derivation
     let derivedKey: Buffer | undefined;
     if (this.simplePeer.initialParams.encrypt) {
-      if (!privateKey || !publicKey)
-        throw new Error("Local key pair was not loaded");
-      if (!sessionRequest!.publicKey)
-        throw new Error("Distant peer did not provide its public key");
+      if (!sessionRequest!.publicKey) {
+        this.simplePeer.emit("onEncryptionNegotiationFailed", sessionRequest!);
+        await this.simplePeer.close("NEGOTIATION_FAILURE");
+        return;
+      }
 
-      const distantPublicKey = createPublicKey(sessionRequest!.publicKey);
+      try {
+        const distantPublicKey = createPublicKey(sessionRequest!.publicKey);
 
-      const publicKeyFingerprint = createHash("sha256")
-        .update(sessionRequest!.publicKey)
-        .digest("hex");
+        const publicKeyFingerprint = createHash("sha256")
+          .update(sessionRequest!.publicKey)
+          .digest("hex");
 
-      const knownTagsDir =
-        this.simplePeer.initialParams.vaultDir ??
-        join(homedir(), ".peerce", "vault");
-      const knownTagsEntry = await getKnownTagsEntry(
-        this.simplePeer.initialParams.distantTag,
-        knownTagsDir
-      );
-
-      if (!knownTagsEntry)
-        await upsertKnownTagsEntry(
+        const knownTagsDir =
+          this.simplePeer.initialParams.vaultDir ??
+          join(homedir(), ".peerce", "vault");
+        const knownTagsEntry = await getKnownTagsEntry(
           this.simplePeer.initialParams.distantTag,
-          {
-            fingerprint: publicKeyFingerprint,
-            publicKey: sessionRequest!.publicKey,
-            lastUpdate: new Date().toISOString(),
-          },
           knownTagsDir
         );
-      else if (knownTagsEntry.fingerprint !== publicKeyFingerprint)
-        // do nothing until action is taken outside of this code
-        this.simplePeer.emit(
-          "onPublicKeyMismatch",
-          this.simplePeer.initialParams.distantTag,
-          knownTagsEntry,
-          {
-            fingerprint: publicKeyFingerprint,
-            publicKey: sessionRequest!.publicKey,
-          }
+
+        if (!knownTagsEntry)
+          await upsertKnownTagsEntry(
+            this.simplePeer.initialParams.distantTag,
+            {
+              fingerprint: publicKeyFingerprint,
+              publicKey: sessionRequest!.publicKey,
+              lastUpdate: new Date().toISOString(),
+            },
+            knownTagsDir
+          );
+        else if (knownTagsEntry.fingerprint !== publicKeyFingerprint) {
+          this.simplePeer.emit(
+            "onPublicKeyMismatch",
+            this.simplePeer.initialParams.distantTag,
+            knownTagsEntry,
+            {
+              fingerprint: publicKeyFingerprint,
+              publicKey: sessionRequest!.publicKey,
+            }
+          );
+          await this.simplePeer.close("PUBLIC_KEY_MISMATCH");
+        }
+
+        const sharedSecret = diffieHellman({
+          privateKey: privateKey!,
+          publicKey: distantPublicKey,
+        });
+
+        const publicKeys = [publicKey, sessionRequest!.publicKey]
+          .sort()
+          .join(":");
+
+        derivedKey = Buffer.from(
+          hkdfSync(
+            "sha256",
+            sharedSecret,
+            sessionRequest!.salt!,
+            `peerce-key-derivation:${publicKeys}`,
+            32
+          )
         );
-
-      const sharedSecret = diffieHellman({
-        privateKey,
-        publicKey: distantPublicKey,
-      });
-
-      derivedKey = Buffer.from(
-        hkdfSync("sha256", sharedSecret, sessionRequest!.salt!, "todo: aad", 32)
-      );
+      } catch (e) {
+        logError(e);
+        this.simplePeer.emit("onEncryptionNegotiationFailed", sessionRequest!);
+        await this.simplePeer.close("NEGOTIATION_FAILURE");
+        return;
+      }
     }
 
     logInfo(
@@ -201,6 +220,8 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
         connPromise,
         this.simplePeer.__prematureClosePromise,
       ]);
+    } catch (e) {
+      logError(e);
     } finally {
       transceiver.off("onConnected", peerConnectionListener);
     }
