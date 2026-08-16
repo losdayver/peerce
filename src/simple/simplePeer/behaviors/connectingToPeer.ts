@@ -167,6 +167,7 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
             }
           );
           await this.simplePeer.close("PUBLIC_KEY_MISMATCH");
+          return;
         }
 
         const sharedSecret = diffieHellman({
