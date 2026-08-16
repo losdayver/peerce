@@ -5,14 +5,17 @@ import {
   PeerToPeerMessageDescriptor,
   PeerToPeerSessionRequest,
 } from "../../simpleProtocol";
-import { AnsiColor, logInfo, logProgress } from "../../../utils/logUtils";
-import { chunkPeerToPeerMessages } from "../../simpleUtils";
-import { sleep } from "../../../utils/promiseUtils";
+import { logInfo } from "../../../utils/logUtils";
+import { chunkPeerToPeerMessages, decryptPayload } from "../../simpleUtils";
 import { StateShifterBehaviorBase } from "state-shifter";
 
 export type ConnectedToPeerEventHandler = (
   params: PeerToPeerMessageDescriptor
-) => void; // todo promise&
+) => Promise<void> | void;
+
+type IncomingChunk = Omit<PeerToPeerMessage, "payload"> & {
+  payload: Buffer;
+};
 
 export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
   simplePeer: SimplePeer;
@@ -22,21 +25,19 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
   }
 
   sessionRequest: PeerToPeerSessionRequest | undefined;
+  derivedKey: Buffer | undefined;
 
   chunkCollector = new Map<
     PeerToPeerMessage["fileName"],
-    Map<PeerToPeerMessage["chunkNo"], PeerToPeerMessage["payload"]>
+    Map<PeerToPeerMessage["chunkNo"], Buffer>
   >();
   private isActive = false;
 
-  private addToChunkCollector = (chunk: PeerToPeerMessage) => {
+  private addToChunkCollector = (chunk: IncomingChunk) => {
     let inner = this.chunkCollector.get(chunk.fileName);
 
     if (!inner) {
-      inner = new Map<
-        PeerToPeerMessage["chunkNo"],
-        PeerToPeerMessage["payload"]
-      >();
+      inner = new Map<PeerToPeerMessage["chunkNo"], Buffer>();
       this.chunkCollector.set(chunk.fileName, inner);
       this.simplePeer.emit("onIncomingTransmissionStart", chunk.fileName);
     }
@@ -57,7 +58,7 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     const fullBuffer = Buffer.concat(
       [...chunks.entries()]
         .sort(([a], [b]) => a - b)
-        .map(([, payload]) => Buffer.from(payload, "base64"))
+        .map(([, payload]) => payload)
     );
 
     this.simplePeer.emit("onFullMessage", {
@@ -71,7 +72,11 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     const { transceiver } = this.simplePeer;
     const { distantAddress, distantPort } = this.sessionRequest!;
     logInfo(`sending "${params.fileName}"`);
-    const { fileName, messages } = chunkPeerToPeerMessages(params);
+    const { fileName, messages } = chunkPeerToPeerMessages({
+      ...params,
+      encrypt: this.derivedKey !== undefined,
+      secret: this.derivedKey,
+    });
     for (const [index, msg] of messages.entries()) {
       if (!this.isActive || !transceiver.canSend(distantAddress, distantPort))
         return;
@@ -97,7 +102,24 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     )
       return;
 
-    this.addToChunkCollector(JSON.parse(msg.toString()));
+    const chunk = JSON.parse(msg.toString()) as PeerToPeerMessage;
+    let payload: Buffer;
+
+    if (this.derivedKey) {
+      if (!chunk.authTag)
+        throw new Error("Encrypted chunk does not contain an auth tag");
+
+      payload = decryptPayload(
+        chunk.payload,
+        this.derivedKey,
+        chunk.nonce!,
+        chunk.authTag
+      );
+    } else {
+      payload = Buffer.from(chunk.payload, "hex");
+    }
+
+    this.addToChunkCollector({ ...chunk, payload });
   };
 
   private onPeerSessionClosed = (address: string, port: number) => {
@@ -114,9 +136,13 @@ export class ConnectedToPeer extends StateShifterBehaviorBase<SimplePeerStateShi
     void this.simplePeer.stateMachine.shiftTo("closing");
   };
 
-  onEnter = (_, sessionRequest: PeerToPeerSessionRequest) => {
+  onEnter = (
+    _,
+    sessionRequest: PeerToPeerSessionRequest & { derivedKey?: Buffer }
+  ) => {
     const { transceiver } = this.simplePeer;
     this.sessionRequest = sessionRequest;
+    this.derivedKey = sessionRequest.derivedKey;
     this.isActive = true;
 
     logInfo(

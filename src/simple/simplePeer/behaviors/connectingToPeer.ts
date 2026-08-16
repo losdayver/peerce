@@ -2,11 +2,24 @@ import { SimplePeerStateShifterConfig } from "../stateMeta";
 import { SimplePeer } from "../simplePeer";
 import { getResolver } from "../../../utils/promiseUtils";
 import {
+  KeysJson,
   PeerToPeerSessionRequest,
   PeerToRelaySessionRequest,
 } from "../../simpleProtocol";
-import { logInfo } from "../../../utils/logUtils";
+import { logError, logInfo } from "../../../utils/logUtils";
 import { StateShifterBehaviorBase } from "state-shifter";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import {
+  createHash,
+  createPrivateKey,
+  createPublicKey,
+  diffieHellman,
+  hkdfSync,
+  KeyObject,
+} from "node:crypto";
+import { homedir } from "node:os";
+import { getKnownTagsEntry, upsertKnownTagsEntry } from "../../simpleUtils";
 
 export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateShifterConfig> {
   constructor(private simplePeer: SimplePeer) {
@@ -21,11 +34,32 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
     const { initialParams, transceiver, stateMachine } = this.simplePeer;
     const { distantTag, relayAddr, relayPort, selfTag } = initialParams;
 
+    // If encryption is turned on, get or create new key pair
+    let privateKey: KeyObject | undefined;
+    let publicKey: string | undefined;
+    if (this.simplePeer.initialParams.encrypt) {
+      const { vaultDir = join(homedir(), ".peerce", "vault") } =
+        this.simplePeer.initialParams;
+      const keysJson = JSON.parse(
+        await readFile(join(vaultDir, "keys.json"), "utf8")
+      ) as KeysJson;
+      const latestEntry = keysJson.at(-1);
+
+      if (!latestEntry) throw new Error("No keys found in keys.json");
+
+      const [privateKeyPem, publicKeyPem] = await Promise.all([
+        readFile(join(vaultDir, latestEntry.privateKeyFile)),
+        readFile(join(vaultDir, latestEntry.publicKeyFile)),
+      ]);
+
+      privateKey = createPrivateKey(privateKeyPem);
+      publicKey = publicKeyPem.toString("utf8");
+    }
+
     logInfo(`awaiting session request from "${distantTag}"`);
 
     transceiver.on("onSessionClosed", this.onRelayClose);
 
-    // Awaiting session request
     let sessionRequest: PeerToPeerSessionRequest;
     let { promise: peerRequestPromise, resolver: peerRequestResolver } =
       getResolver();
@@ -42,40 +76,128 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
           if (sessionRequest.distantTag !== distantTag) return;
           peerRequestResolver.resolve?.();
         } catch (e) {
-          console.error(e);
+          logError(e);
         }
       }
     };
-    transceiver.once("onReceive", sessionRequestListener);
+    transceiver.on("onReceive", sessionRequestListener);
 
-    void transceiver.send(
-      relayAddr,
-      relayPort,
-      JSON.stringify({
-        selfTag,
-        distantTag,
-      } satisfies PeerToRelaySessionRequest)
-    );
+    // Send own session request to the relay
+    let value: unknown;
+    try {
+      void transceiver.send(
+        relayAddr,
+        relayPort,
+        JSON.stringify({
+          selfTag,
+          distantTag,
+          encrypt: this.simplePeer.initialParams.encrypt,
+          ...(this.simplePeer.initialParams.encrypt && publicKey
+            ? { publicKey }
+            : {}),
+        } satisfies PeerToRelaySessionRequest)
+      );
 
-    let value = await Promise.race([
-      peerRequestPromise,
-      this.simplePeer.__prematureClosePromise,
-    ]);
+      // Await session request from relay
+      value = await Promise.race([
+        peerRequestPromise,
+        this.simplePeer.__prematureClosePromise,
+      ]);
+    } finally {
+      transceiver.off("onReceive", sessionRequestListener);
+    }
 
-    if (value == "PREMATURE_CLOSE") {
+    if (value == "PREMATURE_CLOSE") return;
+
+    logInfo(`got session request from "${distantTag}"`);
+
+    // Got session request object and trying to connect to peer
+    if (
+      sessionRequest!.negotiationFailure === "ENCRYPTION_MISMATCH" ||
+      Boolean(this.simplePeer.initialParams.encrypt) !==
+        Boolean(sessionRequest!.encrypt)
+    ) {
+      this.simplePeer.emit("onEncryptionNegotiationFailed", sessionRequest!);
+      await this.simplePeer.close("NEGOTIATION_FAILURE");
       return;
     }
 
-    logInfo(`got session request from "${distantTag}"`);
-    // Got session request object and trying to connect to peer
+    // Shared secret's key derivation
+    let derivedKey: Buffer | undefined;
+    if (this.simplePeer.initialParams.encrypt) {
+      if (!sessionRequest!.publicKey) {
+        this.simplePeer.emit("onEncryptionNegotiationFailed", sessionRequest!);
+        await this.simplePeer.close("NEGOTIATION_FAILURE");
+        return;
+      }
+
+      try {
+        const distantPublicKey = createPublicKey(sessionRequest!.publicKey);
+
+        const publicKeyFingerprint = createHash("sha256")
+          .update(sessionRequest!.publicKey)
+          .digest("hex");
+
+        const knownTagsDir =
+          this.simplePeer.initialParams.vaultDir ??
+          join(homedir(), ".peerce", "vault");
+        const knownTagsEntry = await getKnownTagsEntry(
+          this.simplePeer.initialParams.distantTag,
+          knownTagsDir
+        );
+
+        if (!knownTagsEntry)
+          await upsertKnownTagsEntry(
+            this.simplePeer.initialParams.distantTag,
+            {
+              fingerprint: publicKeyFingerprint,
+              publicKey: sessionRequest!.publicKey,
+              lastUpdate: new Date().toISOString(),
+            },
+            knownTagsDir
+          );
+        else if (knownTagsEntry.fingerprint !== publicKeyFingerprint) {
+          this.simplePeer.emit(
+            "onPublicKeyMismatch",
+            this.simplePeer.initialParams.distantTag,
+            knownTagsEntry,
+            {
+              fingerprint: publicKeyFingerprint,
+              publicKey: sessionRequest!.publicKey,
+            }
+          );
+          await this.simplePeer.close("PUBLIC_KEY_MISMATCH");
+          return;
+        }
+
+        const sharedSecret = diffieHellman({
+          privateKey: privateKey!,
+          publicKey: distantPublicKey,
+        });
+
+        const publicKeys = [publicKey, sessionRequest!.publicKey]
+          .sort()
+          .join(":");
+
+        derivedKey = Buffer.from(
+          hkdfSync(
+            "sha256",
+            sharedSecret,
+            sessionRequest!.salt!,
+            `peerce-key-derivation:${publicKeys}`,
+            32
+          )
+        );
+      } catch (e) {
+        logError(e);
+        this.simplePeer.emit("onEncryptionNegotiationFailed", sessionRequest!);
+        await this.simplePeer.close("NEGOTIATION_FAILURE");
+        return;
+      }
+    }
 
     logInfo(
       `connecting to peer ${sessionRequest!.distantAddress}:${sessionRequest!.distantPort}`
-    );
-
-    transceiver.connect(
-      sessionRequest!.distantAddress,
-      sessionRequest!.distantPort
     );
 
     // Await connection from peer
@@ -87,19 +209,33 @@ export class ConnectingToPeer extends StateShifterBehaviorBase<SimplePeerStateSh
       )
         connResolver.resolve?.();
     };
-    transceiver.once("onConnected", peerConnectionListener);
+    transceiver.on("onConnected", peerConnectionListener);
 
-    value = await Promise.race([
-      connPromise,
-      this.simplePeer.__prematureClosePromise,
-    ]);
+    try {
+      transceiver.connect(
+        sessionRequest!.distantAddress,
+        sessionRequest!.distantPort
+      );
+
+      value = await Promise.race([
+        connPromise,
+        this.simplePeer.__prematureClosePromise,
+      ]);
+    } catch (e) {
+      logError(e);
+    } finally {
+      transceiver.off("onConnected", peerConnectionListener);
+    }
     if (value == "PREMATURE_CLOSE") {
       return;
     }
 
     this.simplePeer.emit("onConnectedToPeer", sessionRequest!);
 
-    await stateMachine.shiftTo("connectedToPeer", sessionRequest!);
+    await stateMachine.shiftTo("connectedToPeer", {
+      ...sessionRequest!,
+      derivedKey,
+    });
   };
   onExit = async () => {
     const { relayAddr, relayPort } = this.simplePeer.initialParams;

@@ -1,6 +1,6 @@
 {
   "name": "peerce",
-  "version": "0.2.0-alpha.3",
+  "version": "0.2.0-alpha.4",
   "description": "Simple UDP data transfer package based on NAT hole punching",
   "type": "commonjs",
   "scripts": {
@@ -58,8 +58,9 @@
     "tag": "next"
   },
   "bin": {
-    "peerce": "./dist/simple/bin/peer.js",
-    "peerce-relay": "./dist/simple/bin/relay.js"
+    "peerce-exchange": "./dist/simple/bin/peer.js",
+    "peerce-start-relay": "./dist/simple/bin/relay.js",
+    "peerce-keygen": "./dist/simple/bin/keygen.js"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

@@ -2,6 +2,11 @@ node_modules/
 dist/
 misc/
 types/
+<<<<<<< HEAD
 vault/
 out/
 *.tgz
+=======
+out/
+vault/
+>>>>>>> e451df7b0d229a2c506098dc40251e259aa0fc16
