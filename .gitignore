@@ -1,5 +1,7 @@
 node_modules/
 dist/
 misc/
-*.tgz
 types/
+vault/
+out/
+*.tgz
